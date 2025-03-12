@@ -14,12 +14,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   };
 
+  // Add new route for creating engineer accounts (admin only)
+  app.post("/api/engineers", requireAdmin, async (req, res) => {
+    try {
+      const existingUser = await storage.getUserByUsername(req.body.username);
+      if (existingUser) {
+        return res.status(400).send("Username already exists");
+      }
+
+      const user = await storage.createUser({
+        username: req.body.username,
+        password: req.body.password,
+        isAdmin: false // Force isAdmin to false for engineer accounts
+      });
+
+      res.status(201).json(user);
+    } catch (err) {
+      res.status(500).send((err as Error).message);
+    }
+  });
+
   // Location tracking
   app.post("/api/location", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     try {
       const location = await storage.createLocation({
-        userId: req.user.id,
+        userId: req.user._id,
         latitude: req.body.latitude,
         longitude: req.body.longitude,
         timestamp: new Date(),

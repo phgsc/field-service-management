@@ -1,13 +1,59 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Loader2, MapPin } from "lucide-react";
+import { Loader2, MapPin, Plus } from "lucide-react";
 import { Location, User, Visit } from "@shared/schema";
 import { format } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { useForm } from "react-hook-form";
+import { useState } from "react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+
+// Add CreateEngineerForm component
+function CreateEngineerForm({ onSuccess }: { onSuccess: () => void }) {
+  const form = useForm({
+    defaultValues: { username: "", password: "" }
+  });
+
+  const createEngineerMutation = useMutation({
+    mutationFn: async (data: { username: string; password: string }) => {
+      const res = await apiRequest("POST", "/api/engineers", {
+        ...data,
+        isAdmin: false
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/engineers"] });
+      form.reset();
+      onSuccess();
+    }
+  });
+
+  return (
+    <form onSubmit={form.handleSubmit((data) => createEngineerMutation.mutate(data))} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="username">Username</Label>
+        <Input id="username" {...form.register("username")} required />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="password">Password</Label>
+        <Input id="password" type="password" {...form.register("password")} required />
+      </div>
+      <Button type="submit" className="w-full" disabled={createEngineerMutation.isPending}>
+        {createEngineerMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        Create Engineer Account
+      </Button>
+    </form>
+  );
+}
 
 export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const { data: engineers } = useQuery<User[]>({
     queryKey: ["/api/engineers"],
@@ -17,15 +63,15 @@ export default function Dashboard() {
     queryKey: ["/api/visits"],
   });
 
-  const engineerLocations = useQuery<{ [key: number]: Location[] }>({
+  const engineerLocations = useQuery<{ [key: string]: Location[] }>({
     queryKey: ["/api/engineers/locations"],
     queryFn: async () => {
       if (!engineers) return {};
-      const locations: { [key: number]: Location[] } = {};
+      const locations: { [key: string]: Location[] } = {};
       for (const engineer of engineers) {
-        const res = await fetch(`/api/engineers/${engineer.id}/location`);
+        const res = await fetch(`/api/engineers/${engineer._id}/location`);
         if (res.ok) {
-          locations[engineer.id] = await res.json();
+          locations[engineer._id] = await res.json();
         }
       }
       return locations;
@@ -38,30 +84,46 @@ export default function Dashboard() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Admin Dashboard - {user?.username}</CardTitle>
-          <Button
-            variant="destructive"
-            onClick={() => logoutMutation.mutate()}
-            disabled={logoutMutation.isPending}
-          >
-            {logoutMutation.isPending && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            )}
-            Logout
-          </Button>
+          <div className="flex gap-2">
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Engineer
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create Engineer Account</DialogTitle>
+                </DialogHeader>
+                <CreateEngineerForm onSuccess={() => setIsDialogOpen(false)} />
+              </DialogContent>
+            </Dialog>
+            <Button
+              variant="destructive"
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+            >
+              {logoutMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Logout
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
             <div className="space-y-2">
               <h3 className="font-semibold">Field Engineers</h3>
               {engineers?.map((engineer) => {
-                const locations = engineerLocations.data?.[engineer.id] || [];
+                const locations = engineerLocations.data?.[engineer._id] || [];
                 const lastLocation = locations[locations.length - 1];
                 const activeVisit = visits?.find(
-                  (v) => v.userId === engineer.id && !v.endTime,
+                  (v) => v.userId === engineer._id && !v.endTime,
                 );
 
                 return (
-                  <Card key={engineer.id}>
+                  <Card key={engineer._id}>
                     <CardContent className="pt-6 space-y-2">
                       <div className="flex justify-between items-center">
                         <span className="font-medium">{engineer.username}</span>
@@ -92,7 +154,7 @@ export default function Dashboard() {
             <div className="space-y-2">
               <h3 className="font-semibold">Recent Visits</h3>
               {visits?.map((visit) => {
-                const engineer = engineers?.find((e) => e.id === visit.userId);
+                const engineer = engineers?.find((e) => e._id === visit.userId);
                 return (
                   <Card key={visit.id}>
                     <CardContent className="pt-6 space-y-2">
