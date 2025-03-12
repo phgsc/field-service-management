@@ -1,7 +1,8 @@
-import type { User, InsertUser, Location, InsertLocation, Visit, InsertVisit } from "@shared/schema";
+import type { User, InsertUser, Location, InsertLocation, Visit, InsertVisit, UpdateProfile } from "@shared/schema";
 import session from "express-session";
 import { User as UserModel, Location as LocationModel, Visit as VisitModel } from "./db";
 import createMemoryStore from "memorystore";
+import { hashPassword } from "./auth";
 
 const MemoryStore = createMemoryStore(session);
 
@@ -9,6 +10,8 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserProfile(id: string, profile: UpdateProfile): Promise<User | undefined>;
+  resetUserPassword(id: string, newPassword: string): Promise<User | undefined>;
   getLocations(userId: string): Promise<Location[]>;
   createLocation(location: InsertLocation): Promise<Location>;
   getVisits(userId?: string): Promise<Visit[]>;
@@ -49,6 +52,30 @@ export class MongoStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const user = await UserModel.create(insertUser);
     return convertDocument<User>(user);
+  }
+
+  async updateUserProfile(id: string, profile: UpdateProfile): Promise<User | undefined> {
+    const user = await UserModel.findByIdAndUpdate(
+      id,
+      { $set: { profile } },
+      { new: true }
+    );
+    return user ? convertDocument<User>(user) : undefined;
+  }
+
+  async resetUserPassword(id: string, newPassword: string): Promise<User | undefined> {
+    const hashedPassword = await hashPassword(newPassword);
+    const user = await UserModel.findByIdAndUpdate(
+      id,
+      { 
+        $set: { 
+          password: hashedPassword,
+          'profile.lastPasswordReset': new Date()
+        }
+      },
+      { new: true }
+    );
+    return user ? convertDocument<User>(user) : undefined;
   }
 
   async getLocations(userId: string): Promise<Location[]> {

@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
+import { insertUserSchema, updateProfileSchema, resetPasswordSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
@@ -25,10 +26,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.createUser({
         username: req.body.username,
         password: req.body.password,
-        isAdmin: false // Force isAdmin to false for engineer accounts
+        isAdmin: false, // Force isAdmin to false for engineer accounts
+        profile: {
+          name: req.body.name,
+          designation: req.body.designation
+        }
       });
 
       res.status(201).json(user);
+    } catch (err) {
+      res.status(500).send((err as Error).message);
+    }
+  });
+
+  // Profile management routes
+  app.get("/api/engineers/:id/profile", requireAdmin, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) return res.status(404).send("Engineer not found");
+      res.json(user.profile);
+    } catch (err) {
+      res.status(500).send((err as Error).message);
+    }
+  });
+
+  app.patch("/api/engineers/:id/profile", requireAdmin, async (req, res) => {
+    try {
+      const updateData = updateProfileSchema.parse(req.body);
+      const user = await storage.updateUserProfile(req.params.id, updateData);
+      if (!user) return res.status(404).send("Engineer not found");
+      res.json(user);
+    } catch (err) {
+      res.status(500).send((err as Error).message);
+    }
+  });
+
+  // Password reset route (admin only)
+  app.post("/api/engineers/:id/reset-password", requireAdmin, async (req, res) => {
+    try {
+      const { newPassword } = resetPasswordSchema.parse(req.body);
+      const user = await storage.resetUserPassword(req.params.id, newPassword);
+      if (!user) return res.status(404).send("Engineer not found");
+      res.json({ message: "Password reset successful" });
     } catch (err) {
       res.status(500).send((err as Error).message);
     }
@@ -39,7 +78,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.user) return res.sendStatus(401);
     try {
       const location = await storage.createLocation({
-        userId: req.user._id,
+        userId: req.user.id,
         latitude: req.body.latitude,
         longitude: req.body.longitude,
         timestamp: new Date(),
@@ -70,10 +109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/visits/:id/end", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     try {
-      const visit = await storage.updateVisit(
-        parseInt(req.params.id),
-        new Date(),
-      );
+      const visit = await storage.updateVisit(req.params.id, new Date());
       res.json(visit);
     } catch (err) {
       res.status(500).send((err as Error).message);
@@ -104,7 +140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/engineers/:id/location", requireAdmin, async (req, res) => {
     try {
-      const locations = await storage.getLocations(parseInt(req.params.id));
+      const locations = await storage.getLocations(req.params.id);
       res.json(locations);
     } catch (err) {
       res.status(500).send((err as Error).message);

@@ -23,11 +23,16 @@ db.on('error', (error) => {
   console.error('MongoDB connection error:', error);
 });
 
-// User Schema
+// User Schema with extended profile information
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  isAdmin: { type: Boolean, default: false }
+  isAdmin: { type: Boolean, default: false },
+  profile: {
+    name: { type: String },
+    designation: { type: String },
+    lastPasswordReset: { type: Date }
+  }
 });
 
 // Location Schema

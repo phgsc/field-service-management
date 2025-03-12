@@ -1,9 +1,25 @@
 import { z } from "zod";
 
+export const userProfileSchema = z.object({
+  name: z.string().optional(),
+  designation: z.string().optional(),
+  lastPasswordReset: z.date().optional()
+});
+
 export const insertUserSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   isAdmin: z.boolean().default(false),
+  profile: userProfileSchema.optional()
+});
+
+export const updateProfileSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  designation: z.string().min(1, "Designation is required")
+});
+
+export const resetPasswordSchema = z.object({
+  newPassword: z.string().min(6, "Password must be at least 6 characters")
 });
 
 export const insertLocationSchema = z.object({
@@ -25,6 +41,7 @@ export const insertVisitSchema = z.object({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertLocation = z.infer<typeof insertLocationSchema>;
 export type InsertVisit = z.infer<typeof insertVisitSchema>;
+export type UpdateProfile = z.infer<typeof updateProfileSchema>;
 
 // Update interfaces to use id instead of _id to match the client expectations
 export interface User {
@@ -32,6 +49,11 @@ export interface User {
   username: string;
   password: string;
   isAdmin: boolean;
+  profile?: {
+    name?: string;
+    designation?: string;
+    lastPasswordReset?: Date;
+  };
 }
 
 export interface Location {
