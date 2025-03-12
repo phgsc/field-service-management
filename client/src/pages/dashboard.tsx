@@ -150,12 +150,54 @@ function ResetPasswordForm({
   );
 }
 
+// Add ViewProfileDialog component
+function ViewProfileDialog({ 
+  engineer, 
+  onClose 
+}: { 
+  engineer: User; 
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Engineer Profile</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Username</Label>
+            <p className="text-sm text-muted-foreground">{engineer.username}</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Full Name</Label>
+            <p className="text-sm text-muted-foreground">{engineer.profile?.name || "Not set"}</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Designation</Label>
+            <p className="text-sm text-muted-foreground">{engineer.profile?.designation || "Not set"}</p>
+          </div>
+          {engineer.profile?.lastPasswordReset && (
+            <div className="space-y-2">
+              <Label>Last Password Reset</Label>
+              <p className="text-sm text-muted-foreground">
+                {format(new Date(engineer.profile.lastPasswordReset), "PPp")}
+              </p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedEngineer, setSelectedEngineer] = useState<User | null>(null);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
+  const [isViewProfileOpen, setIsViewProfileOpen] = useState(false);
 
   const { data: engineers } = useQuery<User[]>({
     queryKey: ["/api/engineers"],
@@ -235,6 +277,16 @@ export default function Dashboard() {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => {
+                              setSelectedEngineer(engineer);
+                              setIsViewProfileOpen(true);
+                            }}
+                          >
+                            View Profile
+                          </Button>
                           <Dialog open={isEditProfileOpen && selectedEngineer?.id === engineer.id} 
                                  onOpenChange={(open) => {
                                    setIsEditProfileOpen(open);
@@ -280,7 +332,6 @@ export default function Dashboard() {
                               )}
                             </DialogContent>
                           </Dialog>
-
                           <span
                             className={`px-2 py-1 rounded text-sm ${
                               activeVisit
@@ -340,6 +391,41 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+      {selectedEngineer && isViewProfileOpen && (
+        <ViewProfileDialog
+          engineer={selectedEngineer}
+          onClose={() => {
+            setIsViewProfileOpen(false);
+            setSelectedEngineer(null);
+          }}
+        />
+      )}
+      <Dialog open={isEditProfileOpen} onOpenChange={setIsEditProfileOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Engineer Profile</DialogTitle>
+          </DialogHeader>
+          {selectedEngineer && (
+            <EditProfileForm 
+              engineer={selectedEngineer} 
+              onSuccess={() => setIsEditProfileOpen(false)} 
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isResetPasswordOpen} onOpenChange={setIsResetPasswordOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+          </DialogHeader>
+          {selectedEngineer && (
+            <ResetPasswordForm
+              engineer={selectedEngineer}
+              onSuccess={() => setIsResetPasswordOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
