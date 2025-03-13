@@ -201,12 +201,19 @@ export default function EngineerView() {
   const startServiceMutation = useMutation({
     mutationFn: async (visitId: string) => {
       const res = await apiRequest("POST", `/api/visits/${visitId}/start-service`);
-      return await res.json();
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/visits"] });
-      toast({ title: "Service started" });
+      toast({ title: "Service started successfully" });
     },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to start service",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   });
 
   const completeServiceMutation = useMutation({
@@ -249,7 +256,7 @@ export default function EngineerView() {
     }
   };
 
-  // Update the active visit check
+  // Update the active visit check to include on_route status
   const activeVisit = visits?.find(v =>
     ['on_route', 'in_service'].includes(v.status.toLowerCase())
   );
@@ -345,7 +352,7 @@ export default function EngineerView() {
                   <div className="flex justify-between items-center">
                     <div>
                       <span className="font-medium">Job ID: {activeVisit.jobId}</span>
-                      <div className="text-sm text-muted-foreground">
+                      <div className={`text-sm ${getStatusStyle(activeVisit.status)}`}>
                         Status: {activeVisit.status}
                       </div>
                     </div>

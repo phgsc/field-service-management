@@ -132,13 +132,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/visits/:id/start-service", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     try {
-      const visit = await storage.updateVisitStatus(req.params.id, {
+      const visit = await storage.getVisit(req.params.id);
+      if (!visit) return res.status(404).send("Visit not found");
+
+      if (visit.status.toLowerCase() !== 'on_route') {
+        return res.status(400).send("Visit must be on route to start service");
+      }
+
+      const now = new Date();
+      const journeyTimeInMinutes = visit.journeyStartTime ? 
+        Math.floor((now.getTime() - new Date(visit.journeyStartTime).getTime()) / (1000 * 60)) : 0;
+
+      const updateData: Partial<Visit> = {
         status: 'in_service',
-        journeyEndTime: new Date(),
-        serviceStartTime: new Date(),
-        totalJourneyTime: req.body.totalJourneyTime,
-      });
-      res.json(visit);
+        journeyEndTime: now,
+        serviceStartTime: now,
+        totalJourneyTime: (visit.totalJourneyTime || 0) + journeyTimeInMinutes
+      };
+
+      const updatedVisit = await storage.updateVisitStatus(req.params.id, updateData);
+      res.json(updatedVisit);
     } catch (err) {
       res.status(500).send((err as Error).message);
     }
@@ -194,16 +207,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).send("Visit must be paused or blocked to resume");
       }
 
-      const updateData = {
+      const now = new Date();
+      const updateData: Partial<Visit> = {
         status: req.body.resumeType === 'journey' ? 'on_route' : 'in_service',
         endTime: null,
-        serviceEndTime: null,
+        serviceEndTime: null
       };
 
       if (req.body.resumeType === 'journey') {
-        updateData.journeyStartTime = new Date();
+        updateData.journeyStartTime = now;
+        updateData.journeyEndTime = null;
       } else {
-        updateData.serviceStartTime = new Date();
+        updateData.serviceStartTime = now;
+        updateData.serviceEndTime = null;
       }
 
       const updatedVisit = await storage.updateVisitStatus(req.params.id, updateData);
