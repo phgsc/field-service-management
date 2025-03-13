@@ -161,6 +161,13 @@ export default function EngineerView() {
       setIsResumeDialogOpen(false);
       toast({ title: "Visit resumed successfully" });
     },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to resume visit",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   });
 
   // Unblock visit mutation
@@ -228,6 +235,25 @@ export default function EngineerView() {
     v.status === ServiceStatus.IN_JOURNEY ||
     v.status === ServiceStatus.IN_SERVICE
   );
+
+  // Helper function to get status-based style
+  const getStatusStyle = (status: string) => {
+    switch (status) {
+      case ServiceStatus.COMPLETED:
+        return "bg-green-500/10 text-green-500";
+      case ServiceStatus.ON_ROUTE:
+        return "bg-blue-500/10 text-blue-500";
+      case ServiceStatus.IN_SERVICE:
+        return "bg-yellow-500/10 text-yellow-500";
+      case ServiceStatus.PAUSED_NEXT_DAY:
+        return "bg-yellow-500/10 text-yellow-500";
+      case ServiceStatus.BLOCKED:
+        return "bg-red-500/10 text-red-500";
+      default:
+        return "bg-gray-500/10 text-gray-500";
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-background p-4">
@@ -442,17 +468,9 @@ export default function EngineerView() {
                 >
                   <div className="flex justify-between">
                     <span className="font-medium">Job ID: {visit.jobId}</span>
-                    <span className={`px-2 py-0.5 rounded text-xs ${
-                      visit.status === ServiceStatus.COMPLETED
-                        ? "bg-green-500/10 text-green-500"
-                        : visit.status === ServiceStatus.BLOCKED
-                        ? "bg-red-500/10 text-red-500"
-                        : visit.status === ServiceStatus.PAUSED_NEXT_DAY
-                        ? "bg-yellow-500/10 text-yellow-500"
-                        : "bg-blue-500/10 text-blue-500"
-                    }`}>
+                    <div className={`px-2 py-0.5 rounded text-xs ${getStatusStyle(visit.status)}`}>
                       {visit.status}
-                    </span>
+                    </div>
                   </div>
 
                   <div>Start: {format(new Date(visit.startTime), "PPp")}</div>
@@ -523,4 +541,9 @@ export default function EngineerView() {
       </Card>
     </div>
   );
+}
+
+interface UpdateProfile {
+  name: string;
+  designation: string;
 }

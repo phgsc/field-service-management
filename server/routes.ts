@@ -182,7 +182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add new resume routes after the existing visit routes
+  // Update resume route
   app.post("/api/visits/:id/resume", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     try {
@@ -195,7 +195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updateData = {
-        status: req.body.resumeType === 'journey' ? 'IN_JOURNEY' : 'IN_SERVICE',
+        status: req.body.resumeType === 'journey' ? 'ON_ROUTE' : 'IN_SERVICE',
         endTime: null,
         serviceEndTime: null,
       };
