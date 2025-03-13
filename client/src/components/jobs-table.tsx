@@ -31,6 +31,7 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
   const [date, setDate] = useState<Date>(subMonths(new Date(), 1));
   const { toast } = useToast();
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Resume visit mutation
   const resumeVisitMutation = useMutation({
@@ -40,6 +41,7 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/visits"] });
+      setIsDialogOpen(false);
       toast({ title: "Visit resumed successfully" });
     },
     onError: (error: Error) => {
@@ -90,7 +92,7 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
     switch (status) {
       case ServiceStatus.COMPLETED:
         return "bg-green-100 text-green-800";
-      case ServiceStatus.IN_JOURNEY:
+      case ServiceStatus.ON_ROUTE:
       case ServiceStatus.IN_SERVICE:
         return "bg-yellow-100 text-yellow-800";
       case ServiceStatus.PAUSED_NEXT_DAY:
@@ -130,7 +132,7 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
         </Popover>
       </div>
 
-      <Dialog>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Resume Visit</DialogTitle>
@@ -140,7 +142,6 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
               onClick={() => {
                 if (selectedVisit) {
                   resumeVisitMutation.mutate({ visitId: selectedVisit.id, resumeType: 'journey' });
-                  setSelectedVisit(null);
                 }
               }}
               disabled={resumeVisitMutation.isPending}
@@ -152,7 +153,6 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
               onClick={() => {
                 if (selectedVisit) {
                   resumeVisitMutation.mutate({ visitId: selectedVisit.id, resumeType: 'service' });
-                  setSelectedVisit(null);
                 }
               }}
               disabled={resumeVisitMutation.isPending}
@@ -228,15 +228,17 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
                         Track
                       </Link>
                       {visit.status === ServiceStatus.PAUSED_NEXT_DAY && (
-                        <DialogTrigger
-                          asChild
-                          onClick={() => setSelectedVisit(visit)}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedVisit(visit);
+                            setIsDialogOpen(true);
+                          }}
                         >
-                          <Button variant="outline" size="sm">
-                            <Play className="h-4 w-4 mr-1" />
-                            Resume
-                          </Button>
-                        </DialogTrigger>
+                          <Play className="h-4 w-4 mr-1" />
+                          Resume
+                        </Button>
                       )}
                       {visit.status === ServiceStatus.BLOCKED && (
                         <Button
