@@ -5,11 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Visit, ServiceStatus, UpdateProfile } from "@shared/schema";
+import { Visit, ServiceStatus } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Loader2, MapPin, Play, Square, UserCircle,
-  Timer, AlertTriangle, CheckCircle, PauseCircle, Key
+  Timer, AlertTriangle, CheckCircle, PauseCircle, Key, Truck, Ban
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
@@ -97,6 +97,8 @@ export default function EngineerView() {
   const [jobId, setJobId] = useState<string>("");
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
+  const [isResumeDialogOpen, setIsResumeDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: visits } = useQuery<Visit[]>({
@@ -145,6 +147,31 @@ export default function EngineerView() {
         latitude: pos.coords.latitude.toString(),
         longitude: pos.coords.longitude.toString(),
       });
+    },
+  });
+
+  // Resume visit mutation
+  const resumeVisitMutation = useMutation({
+    mutationFn: async ({ visitId, resumeType }: { visitId: string; resumeType: 'journey' | 'service' }) => {
+      const res = await apiRequest("POST", `/api/visits/${visitId}/resume`, { resumeType });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visits"] });
+      setIsResumeDialogOpen(false);
+      toast({ title: "Visit resumed successfully" });
+    },
+  });
+
+  // Unblock visit mutation
+  const unblockVisitMutation = useMutation({
+    mutationFn: async (visitId: string) => {
+      const res = await apiRequest("POST", `/api/visits/${visitId}/unblock`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visits"] });
+      toast({ title: "Visit unblocked successfully" });
     },
   });
 
@@ -374,6 +401,38 @@ export default function EngineerView() {
               </Card>
             )}
 
+            <Dialog open={isResumeDialogOpen} onOpenChange={setIsResumeDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Resume Visit</DialogTitle>
+                </DialogHeader>
+                <div className="flex gap-4 justify-center">
+                  <Button
+                    onClick={() => {
+                      if (selectedVisit) {
+                        resumeVisitMutation.mutate({ visitId: selectedVisit.id, resumeType: 'journey' });
+                      }
+                    }}
+                    disabled={resumeVisitMutation.isPending}
+                  >
+                    <Truck className="mr-2 h-4 w-4" />
+                    Resume Journey
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (selectedVisit) {
+                        resumeVisitMutation.mutate({ visitId: selectedVisit.id, resumeType: 'service' });
+                      }
+                    }}
+                    disabled={resumeVisitMutation.isPending}
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    Resume Service
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             <div className="space-y-2">
               <h3 className="font-semibold">Recent Visits</h3>
               {visits?.map((visit) => (
@@ -416,6 +475,35 @@ export default function EngineerView() {
                   <div className="text-muted-foreground">
                     Location: {visit.latitude}, {visit.longitude}
                   </div>
+
+                  {(visit.status === ServiceStatus.PAUSED_NEXT_DAY || visit.status === ServiceStatus.BLOCKED) && (
+                    <div className="flex gap-2 mt-2">
+                      {visit.status === ServiceStatus.PAUSED_NEXT_DAY && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedVisit(visit);
+                            setIsResumeDialogOpen(true);
+                          }}
+                        >
+                          <Play className="h-4 w-4 mr-1" />
+                          Resume
+                        </Button>
+                      )}
+                      {visit.status === ServiceStatus.BLOCKED && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => unblockVisitMutation.mutate(visit.id)}
+                          disabled={unblockVisitMutation.isPending}
+                        >
+                          <Ban className="h-4 w-4 mr-1" />
+                          Unblock
+                        </Button>
+                      )}
+                    </div>
+                  )}
 
                   {visit.status === ServiceStatus.BLOCKED && visit.blockedSince && (
                     <div className="text-red-500">
