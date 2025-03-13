@@ -90,15 +90,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Visit management
-  app.post("/api/visits/start", async (req, res) => {
+  app.post("/api/visits/start-journey", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     try {
       const visit = await storage.createVisit({
         userId: req.user.id,
+        jobId: req.body.jobId,
+        status: 'in_journey',
         startTime: new Date(),
+        journeyStartTime: new Date(),
         latitude: req.body.latitude,
         longitude: req.body.longitude,
-        notes: req.body.notes,
       });
       res.json(visit);
     } catch (err) {
@@ -106,10 +108,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/visits/:id/end", async (req, res) => {
+  app.post("/api/visits/:id/start-service", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     try {
-      const visit = await storage.updateVisit(req.params.id, new Date());
+      const visit = await storage.updateVisitStatus(req.params.id, {
+        status: 'in_service',
+        journeyEndTime: new Date(),
+        serviceStartTime: new Date(),
+        totalJourneyTime: req.body.totalJourneyTime,
+      });
+      res.json(visit);
+    } catch (err) {
+      res.status(500).send((err as Error).message);
+    }
+  });
+
+  app.post("/api/visits/:id/complete", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    try {
+      const visit = await storage.updateVisitStatus(req.params.id, {
+        status: 'completed',
+        endTime: new Date(),
+        serviceEndTime: new Date(),
+        totalServiceTime: req.body.totalServiceTime,
+      });
+      res.json(visit);
+    } catch (err) {
+      res.status(500).send((err as Error).message);
+    }
+  });
+
+  app.post("/api/visits/:id/pause", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    try {
+      const now = new Date();
+      const updateData = {
+        status: req.body.reason === 'next_day' ? 'paused_next_day' : 'blocked',
+        endTime: now,
+        serviceEndTime: now,
+        totalServiceTime: req.body.totalServiceTime,
+      };
+
+      if (req.body.reason === 'blocked') {
+        updateData.blockedSince = now;
+        updateData.blockReason = req.body.blockReason;
+      }
+
+      const visit = await storage.updateVisitStatus(req.params.id, updateData);
       res.json(visit);
     } catch (err) {
       res.status(500).send((err as Error).message);

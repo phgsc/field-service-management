@@ -29,13 +29,40 @@ export const insertLocationSchema = z.object({
   timestamp: z.date().optional(),
 });
 
+// Enhanced visit schema with job tracking
+export const ServiceStatus = {
+  NOT_STARTED: 'not_started',
+  IN_JOURNEY: 'in_journey',
+  IN_SERVICE: 'in_service',
+  COMPLETED: 'completed',
+  PAUSED_NEXT_DAY: 'paused_next_day',
+  BLOCKED: 'blocked'
+} as const;
+
 export const insertVisitSchema = z.object({
   userId: z.string(),
+  jobId: z.string(),
+  status: z.enum([
+    ServiceStatus.NOT_STARTED,
+    ServiceStatus.IN_JOURNEY,
+    ServiceStatus.IN_SERVICE,
+    ServiceStatus.COMPLETED,
+    ServiceStatus.PAUSED_NEXT_DAY,
+    ServiceStatus.BLOCKED
+  ]),
   startTime: z.date(),
   endTime: z.date().optional(),
+  journeyStartTime: z.date().optional(),
+  journeyEndTime: z.date().optional(),
+  serviceStartTime: z.date().optional(),
+  serviceEndTime: z.date().optional(),
   latitude: z.string(),
   longitude: z.string(),
   notes: z.string().optional(),
+  blockReason: z.string().optional(),
+  blockedSince: z.date().optional(),
+  totalServiceTime: z.number().optional(), // in minutes
+  totalJourneyTime: z.number().optional(), // in minutes
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -45,7 +72,7 @@ export type UpdateProfile = z.infer<typeof updateProfileSchema>;
 
 // Update interfaces to use id instead of _id to match the client expectations
 export interface User {
-  id: string; // Changed from _id to id
+  id: string;
   username: string;
   password: string;
   isAdmin: boolean;
@@ -57,7 +84,7 @@ export interface User {
 }
 
 export interface Location {
-  id: string; // Changed from _id to id
+  id: string;
   userId: string;
   latitude: string;
   longitude: string;
@@ -65,11 +92,21 @@ export interface Location {
 }
 
 export interface Visit {
-  id: string; // Changed from _id to id
+  id: string;
   userId: string;
+  jobId: string;
+  status: keyof typeof ServiceStatus;
   startTime: Date;
   endTime?: Date;
+  journeyStartTime?: Date;
+  journeyEndTime?: Date;
+  serviceStartTime?: Date;
+  serviceEndTime?: Date;
   latitude: string;
   longitude: string;
   notes?: string;
+  blockReason?: string;
+  blockedSince?: Date;
+  totalServiceTime?: number;
+  totalJourneyTime?: number;
 }

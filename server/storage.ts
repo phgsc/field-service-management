@@ -16,7 +16,7 @@ export interface IStorage {
   createLocation(location: InsertLocation): Promise<Location>;
   getVisits(userId?: string): Promise<Visit[]>;
   createVisit(visit: InsertVisit): Promise<Visit>;
-  updateVisit(id: string, endTime: Date): Promise<Visit>;
+  updateVisitStatus(id: string, update: Partial<Visit>): Promise<Visit>;
   getEngineers(): Promise<User[]>;
   sessionStore: session.Store;
 }
@@ -99,10 +99,10 @@ export class MongoStorage implements IStorage {
     return convertDocument<Visit>(newVisit);
   }
 
-  async updateVisit(id: string, endTime: Date): Promise<Visit> {
+  async updateVisitStatus(id: string, update: Partial<Visit>): Promise<Visit> {
     const updatedVisit = await VisitModel.findByIdAndUpdate(
       id,
-      { endTime },
+      { $set: update },
       { new: true }
     );
     if (!updatedVisit) throw new Error("Visit not found");

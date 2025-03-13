@@ -43,14 +43,29 @@ const locationSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now }
 });
 
-// Visit Schema
+// Enhanced Visit Schema
 const visitSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  jobId: { type: String, required: true },
+  status: { 
+    type: String, 
+    required: true,
+    enum: ['not_started', 'in_journey', 'in_service', 'completed', 'paused_next_day', 'blocked'],
+    default: 'not_started'
+  },
   startTime: { type: Date, required: true },
   endTime: { type: Date },
+  journeyStartTime: { type: Date },
+  journeyEndTime: { type: Date },
+  serviceStartTime: { type: Date },
+  serviceEndTime: { type: Date },
   latitude: { type: String, required: true },
   longitude: { type: String, required: true },
-  notes: String
+  notes: String,
+  blockReason: String,
+  blockedSince: { type: Date },
+  totalServiceTime: { type: Number }, // in minutes
+  totalJourneyTime: { type: Number }  // in minutes
 });
 
 export const User = mongoose.model('User', userSchema);
