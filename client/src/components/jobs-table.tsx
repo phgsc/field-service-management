@@ -302,13 +302,13 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {visit.totalJourneyTime
-                      ? `${visit.totalJourneyTime} minutes`
-                      : getElapsedTime(visit.journeyStartTime, visit.journeyEndTime)}
+                      ? `${Math.round(visit.totalJourneyTime)} minutes`
+                      : "Not started"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {visit.totalServiceTime
-                      ? `${visit.totalServiceTime} minutes`
-                      : getElapsedTime(visit.serviceStartTime, visit.serviceEndTime)}
+                      ? `${Math.round(visit.totalServiceTime)} minutes`
+                      : "Not started"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex items-center gap-2">
