@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { JobsTable } from "@/components/jobs-table"; // Added import
+import { AdminNav } from "@/components/admin-nav"; // Added import
 
 
 // Add CreateEngineerForm component
@@ -227,9 +227,10 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background p-4">
+      <AdminNav />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Admin Dashboard - {user?.username}</CardTitle>
+          <CardTitle>Engineer Management</CardTitle>
           <div className="flex gap-2">
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
@@ -258,146 +259,153 @@ export default function Dashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
-            <JobsTable visits={visits || []} engineers={engineers || []} /> {/* Added JobsTable */}
+          <div className="space-y-2">
+            <h3 className="font-semibold">Field Engineers</h3>
+            {engineers?.map((engineer) => {
+              const locations = engineerLocations.data?.[engineer.id] || [];
+              const lastLocation = locations[locations.length - 1];
+              const activeVisit = visits?.find(
+                (v) => v.userId === engineer.id && !v.endTime,
+              );
 
-            <div className="space-y-2">
-              <h3 className="font-semibold">Field Engineers</h3>
-              {engineers?.map((engineer) => {
-                const locations = engineerLocations.data?.[engineer.id] || [];
-                const lastLocation = locations[locations.length - 1];
-                const activeVisit = visits?.find(
-                  (v) => v.userId === engineer.id && !v.endTime,
-                );
-
-                return (
-                  <Card key={engineer.id}>
-                    <CardContent className="pt-6 space-y-2">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span className="font-medium">{engineer.profile?.name || engineer.username}</span>
-                          {engineer.profile?.designation && (
-                            <p className="text-sm text-muted-foreground">{engineer.profile.designation}</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => {
-                              setSelectedEngineer(engineer);
-                              setIsViewProfileOpen(true);
-                            }}
-                          >
-                            View Profile
-                          </Button>
-                          <Dialog open={isEditProfileOpen && selectedEngineer?.id === engineer.id} 
-                                 onOpenChange={(open) => {
-                                   setIsEditProfileOpen(open);
-                                   if (!open) setSelectedEngineer(null);
-                                 }}>
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm" onClick={() => setSelectedEngineer(engineer)}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Edit Engineer Profile</DialogTitle>
-                              </DialogHeader>
-                              {selectedEngineer && (
-                                <EditProfileForm 
-                                  engineer={selectedEngineer} 
-                                  onSuccess={() => setIsEditProfileOpen(false)} 
-                                />
-                              )}
-                            </DialogContent>
-                          </Dialog>
-
-                          <Dialog open={isResetPasswordOpen && selectedEngineer?.id === engineer.id}
-                                 onOpenChange={(open) => {
-                                   setIsResetPasswordOpen(open);
-                                   if (!open) setSelectedEngineer(null);
-                                 }}>
-                            <DialogTrigger asChild>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => setSelectedEngineer(engineer)}
-                                // Only show reset button for non-self admin users
-                                disabled={engineer.id === user?.id || !engineer.isAdmin}
-                              >
-                                <Key className="h-4 w-4" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Reset Password</DialogTitle>
-                              </DialogHeader>
-                              {selectedEngineer && (
-                                <ResetPasswordForm
-                                  engineer={selectedEngineer}
-                                  onSuccess={() => setIsResetPasswordOpen(false)}
-                                />
-                              )}
-                            </DialogContent>
-                          </Dialog>
-                          <span
-                            className={`px-2 py-1 rounded text-sm ${
-                              activeVisit
-                                ? "bg-green-500/10 text-green-500"
-                                : "bg-yellow-500/10 text-yellow-500"
-                            }`}
-                          >
-                            {activeVisit ? "On Visit" : "Available"}
-                          </span>
-                        </div>
+              return (
+                <Card key={engineer.id}>
+                  <CardContent className="pt-6 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="font-medium">
+                          {engineer.profile?.name || engineer.username}
+                        </span>
+                        {engineer.profile?.designation && (
+                          <p className="text-sm text-muted-foreground">
+                            {engineer.profile.designation}
+                          </p>
+                        )}
                       </div>
-                      {lastLocation && (
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <MapPin className="h-4 w-4 mr-1" />
-                          <span>
-                            {lastLocation.latitude}, {lastLocation.longitude}
-                          </span>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedEngineer(engineer);
+                            setIsViewProfileOpen(true);
+                          }}
+                        >
+                          View Profile
+                        </Button>
+                        <Dialog
+                          open={isEditProfileOpen && selectedEngineer?.id === engineer.id}
+                          onOpenChange={(open) => {
+                            setIsEditProfileOpen(open);
+                            if (!open) setSelectedEngineer(null);
+                          }}
+                        >
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedEngineer(engineer)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Edit Engineer Profile</DialogTitle>
+                            </DialogHeader>
+                            {selectedEngineer && (
+                              <EditProfileForm
+                                engineer={selectedEngineer}
+                                onSuccess={() => setIsEditProfileOpen(false)}
+                              />
+                            )}
+                          </DialogContent>
+                        </Dialog>
 
-            <div className="space-y-2">
-              <h3 className="font-semibold">Recent Visits</h3>
-              {visits?.map((visit) => {
-                const engineer = engineers?.find((e) => e.id === visit.userId);
-                return (
-                  <Card key={visit.id}>
-                    <CardContent className="pt-6 space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">{engineer?.profile?.name || engineer?.username}</span>
-                        <span className="text-sm text-muted-foreground">
-                          {format(new Date(visit.startTime), "PPp")}
+                        <Dialog
+                          open={isResetPasswordOpen && selectedEngineer?.id === engineer.id}
+                          onOpenChange={(open) => {
+                            setIsResetPasswordOpen(open);
+                            if (!open) setSelectedEngineer(null);
+                          }}
+                        >
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedEngineer(engineer)}
+                              // Allow admin-to-admin password resets
+                              disabled={engineer.id === user?.id}
+                            >
+                              <Key className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Reset Password</DialogTitle>
+                            </DialogHeader>
+                            {selectedEngineer && (
+                              <ResetPasswordForm
+                                engineer={selectedEngineer}
+                                onSuccess={() => setIsResetPasswordOpen(false)}
+                              />
+                            )}
+                          </DialogContent>
+                        </Dialog>
+                        <span
+                          className={`px-2 py-1 rounded text-sm ${
+                            activeVisit
+                              ? "bg-green-500/10 text-green-500"
+                              : "bg-yellow-500/10 text-yellow-500"
+                          }`}
+                        >
+                          {activeVisit ? "On Visit" : "Available"}
                         </span>
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        Location: {visit.latitude}, {visit.longitude}
+                    </div>
+                    {lastLocation && (
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <MapPin className="h-4 w-4 mr-1" />
+                        <span>
+                          {lastLocation.latitude}, {lastLocation.longitude}
+                        </span>
                       </div>
-                      {visit.endTime && (
-                        <div className="text-sm text-muted-foreground">
-                          Duration:{" "}
-                          {format(
-                            new Date(visit.endTime).getTime() -
-                              new Date(visit.startTime).getTime(),
-                            "HH:mm:ss",
-                          )}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+          <div className="space-y-2">
+            <h3 className="font-semibold">Recent Visits</h3>
+            {visits?.map((visit) => {
+              const engineer = engineers?.find((e) => e.id === visit.userId);
+              return (
+                <Card key={visit.id}>
+                  <CardContent className="pt-6 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">{engineer?.profile?.name || engineer?.username}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {format(new Date(visit.startTime), "PPp")}
+                      </span>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Location: {visit.latitude}, {visit.longitude}
+                    </div>
+                    {visit.endTime && (
+                      <div className="text-sm text-muted-foreground">
+                        Duration:{" "}
+                        {format(
+                          new Date(visit.endTime).getTime() -
+                            new Date(visit.startTime).getTime(),
+                          "HH:mm:ss",
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
