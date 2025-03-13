@@ -352,7 +352,7 @@ export default function EngineerView() {
                     <Timer className="h-5 w-5 text-primary" />
                   </div>
 
-                  {activeVisit.status === ServiceStatus.IN_JOURNEY && (
+                  {activeVisit.status.toLowerCase() === 'on_route' && (
                     <Button
                       className="w-full"
                       onClick={() => startServiceMutation.mutate(activeVisit.id)}
@@ -367,7 +367,7 @@ export default function EngineerView() {
                     </Button>
                   )}
 
-                  {activeVisit.status === ServiceStatus.IN_SERVICE && (
+                  {activeVisit.status.toLowerCase() === 'in_service' && (
                     <div className="space-y-2">
                       <Button
                         className="w-full"
