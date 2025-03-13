@@ -241,16 +241,16 @@ export default function EngineerView() {
 
   // Helper function to get status-based style
   const getStatusStyle = (status: string) => {
-    switch (status) {
-      case 'COMPLETED':
+    switch (status.toLowerCase()) {
+      case 'completed':
         return "bg-green-500/10 text-green-500";
-      case 'ON_ROUTE':
+      case 'on_route':
         return "bg-blue-500/10 text-blue-500";
-      case 'IN_SERVICE':
+      case 'in_service':
         return "bg-yellow-500/10 text-yellow-500";
-      case 'PAUSED_NEXT_DAY':
+      case 'paused_next_day':
         return "bg-yellow-500/10 text-yellow-500";
-      case 'BLOCKED':
+      case 'blocked':
         return "bg-red-500/10 text-red-500";
       default:
         return "bg-gray-500/10 text-gray-500";
@@ -259,13 +259,13 @@ export default function EngineerView() {
 
   // Update the active visit check to handle multiple jobs properly
   const activeVisit = visits?.find(v =>
-    ['ON_ROUTE', 'IN_SERVICE'].includes(v.status) &&
+    ['on_route', 'in_service'].includes(v.status.toLowerCase()) &&
     v.userId === user?.id
   );
 
   // Check if engineer has any active visits before allowing new ones
   const hasActiveVisit = visits?.some(v =>
-    ['ON_ROUTE', 'IN_SERVICE'].includes(v.status) &&
+    ['on_route', 'in_service'].includes(v.status.toLowerCase()) &&
     v.userId === user?.id
   );
 

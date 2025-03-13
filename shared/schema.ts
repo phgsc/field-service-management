@@ -32,7 +32,7 @@ export const insertLocationSchema = z.object({
 // Enhanced visit schema with job tracking
 export const ServiceStatus = {
   NOT_STARTED: 'not_started',
-  IN_JOURNEY: 'in_journey',
+  ON_ROUTE: 'on_route',
   IN_SERVICE: 'in_service',
   COMPLETED: 'completed',
   PAUSED_NEXT_DAY: 'paused_next_day',
@@ -44,7 +44,7 @@ export const insertVisitSchema = z.object({
   jobId: z.string(),
   status: z.enum([
     ServiceStatus.NOT_STARTED,
-    ServiceStatus.IN_JOURNEY,
+    ServiceStatus.ON_ROUTE,
     ServiceStatus.IN_SERVICE,
     ServiceStatus.COMPLETED,
     ServiceStatus.PAUSED_NEXT_DAY,
