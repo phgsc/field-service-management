@@ -1,18 +1,15 @@
-import { MongoStorage } from '../server/storage';
-import { ServiceStatus } from '../shared/schema';
-import type { Visit, User } from '../shared/schema';
-import mongoose from 'mongoose';
+import { MockStorage } from './mocks/storage.mock';
+import { ServiceStatus } from '@shared/schema';
+import type { Visit, User } from '@shared/schema';
 
 describe('Visit Service Tests', () => {
-  let storage: MongoStorage;
+  let storage: MockStorage;
   let testEngineer: User;
   let testVisit: Visit;
 
-  beforeAll(async () => {
-    // Set up test database connection
-    const testDbUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/test-field-service-db';
-    await mongoose.connect(testDbUri);
-    storage = new MongoStorage();
+  beforeEach(async () => {
+    // Create fresh mock storage for each test
+    storage = new MockStorage();
 
     // Create test engineer
     testEngineer = await storage.createUser({
@@ -24,9 +21,7 @@ describe('Visit Service Tests', () => {
         designation: 'Field Engineer'
       }
     });
-  });
 
-  beforeEach(async () => {
     // Create a fresh visit for each test
     testVisit = await storage.createVisit({
       userId: testEngineer.id,
@@ -36,18 +31,6 @@ describe('Visit Service Tests', () => {
       latitude: '51.5074',
       longitude: '-0.1278'
     });
-  });
-
-  afterEach(async () => {
-    // Clean up visits after each test
-    const collections = mongoose.connection.collections;
-    await collections.visits.deleteMany({});
-  });
-
-  afterAll(async () => {
-    // Clean up database and close connection
-    await mongoose.connection.dropDatabase();
-    await mongoose.connection.close();
   });
 
   describe('Visit Status Transitions', () => {
@@ -124,7 +107,7 @@ describe('Visit Service Tests', () => {
   describe('Visit Assignment Tests', () => {
     let otherEngineer: User;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       otherEngineer = await storage.createUser({
         username: 'other-engineer',
         password: 'test-password',

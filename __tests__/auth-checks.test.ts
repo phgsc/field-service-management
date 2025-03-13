@@ -1,19 +1,15 @@
-import { MongoStorage } from '../server/storage';
-import { ServiceStatus } from '../shared/schema';
-import type { Visit, User } from '../shared/schema';
-import mongoose from 'mongoose';
+import { MockStorage } from './mocks/storage.mock';
+import { ServiceStatus } from '@shared/schema';
+import type { Visit, User } from '@shared/schema';
 
 describe('Authorization Checks', () => {
-  let storage: MongoStorage;
+  let storage: MockStorage;
   let engineer: User;
   let admin: User;
   let visit: Visit;
 
-  beforeAll(async () => {
-    // Set up test database connection
-    const testDbUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/test-field-service-db';
-    await mongoose.connect(testDbUri);
-    storage = new MongoStorage();
+  beforeEach(async () => {
+    storage = new MockStorage();
 
     // Create test users
     engineer = await storage.createUser({
@@ -37,12 +33,6 @@ describe('Authorization Checks', () => {
       latitude: '51.5074',
       longitude: '-0.1278'
     });
-  });
-
-  afterAll(async () => {
-    // Clean up database and close connection
-    await mongoose.connection.dropDatabase();
-    await mongoose.connection.close();
   });
 
   describe('Visit Access Control', () => {
