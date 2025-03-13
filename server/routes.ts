@@ -182,6 +182,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add new resume routes after the existing visit routes
+  app.post("/api/visits/:id/resume", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    try {
+      const visit = await storage.getVisit(req.params.id);
+      if (!visit) return res.status(404).send("Visit not found");
+
+      // Only allow resuming paused or blocked visits
+      if (!['PAUSED_NEXT_DAY', 'BLOCKED'].includes(visit.status)) {
+        return res.status(400).send("Visit must be paused or blocked to resume");
+      }
+
+      const updateData = {
+        status: req.body.resumeType === 'journey' ? 'IN_JOURNEY' : 'IN_SERVICE',
+        endTime: null,
+        serviceEndTime: null,
+      };
+
+      if (req.body.resumeType === 'journey') {
+        updateData.journeyStartTime = new Date();
+      } else {
+        updateData.serviceStartTime = new Date();
+      }
+
+      const updatedVisit = await storage.updateVisitStatus(req.params.id, updateData);
+      res.json(updatedVisit);
+    } catch (err) {
+      res.status(500).send((err as Error).message);
+    }
+  });
+
+  app.post("/api/visits/:id/unblock", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    try {
+      const visit = await storage.getVisit(req.params.id);
+      if (!visit) return res.status(404).send("Visit not found");
+
+      if (visit.status !== 'BLOCKED') {
+        return res.status(400).send("Visit must be blocked to unblock");
+      }
+
+      const updatedVisit = await storage.updateVisitStatus(req.params.id, {
+        status: 'NOT_STARTED',
+        blockReason: null,
+        blockedSince: null
+      });
+      res.json(updatedVisit);
+    } catch (err) {
+      res.status(500).send((err as Error).message);
+    }
+  });
+
   app.get("/api/visits", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     try {

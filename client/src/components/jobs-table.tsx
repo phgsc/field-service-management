@@ -5,12 +5,22 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { format, subMonths } from "date-fns";
-import { Calendar as CalendarIcon, MapPin } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, Play, Truck, Ban } from "lucide-react";
 import { useState } from "react";
 import { Visit, ServiceStatus } from "@shared/schema";
 import { Link } from "wouter";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 type JobsTableProps = {
   visits: Visit[];
@@ -19,6 +29,46 @@ type JobsTableProps = {
 
 export function JobsTable({ visits, engineers }: JobsTableProps) {
   const [date, setDate] = useState<Date>(subMonths(new Date(), 1));
+  const { toast } = useToast();
+  const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
+
+  // Resume visit mutation
+  const resumeVisitMutation = useMutation({
+    mutationFn: async ({ visitId, resumeType }: { visitId: string; resumeType: 'journey' | 'service' }) => {
+      const res = await apiRequest("POST", `/api/visits/${visitId}/resume`, { resumeType });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visits"] });
+      toast({ title: "Visit resumed successfully" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to resume visit",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Unblock visit mutation
+  const unblockVisitMutation = useMutation({
+    mutationFn: async (visitId: string) => {
+      const res = await apiRequest("POST", `/api/visits/${visitId}/unblock`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visits"] });
+      toast({ title: "Visit unblocked successfully" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to unblock visit",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
 
   // Filter visits based on selected date
   const filteredVisits = visits.filter(
@@ -80,6 +130,40 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
         </Popover>
       </div>
 
+      <Dialog>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Resume Visit</DialogTitle>
+          </DialogHeader>
+          <div className="flex gap-4 justify-center">
+            <Button
+              onClick={() => {
+                if (selectedVisit) {
+                  resumeVisitMutation.mutate({ visitId: selectedVisit.id, resumeType: 'journey' });
+                  setSelectedVisit(null);
+                }
+              }}
+              disabled={resumeVisitMutation.isPending}
+            >
+              <Truck className="mr-2 h-4 w-4" />
+              Resume Journey
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedVisit) {
+                  resumeVisitMutation.mutate({ visitId: selectedVisit.id, resumeType: 'service' });
+                  setSelectedVisit(null);
+                }
+              }}
+              disabled={resumeVisitMutation.isPending}
+            >
+              <Play className="mr-2 h-4 w-4" />
+              Resume Service
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="rounded-md border">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -100,7 +184,7 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
                 Service Time
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Location
+                Actions
               </th>
             </tr>
           </thead>
@@ -135,13 +219,37 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
                       : getElapsedTime(visit.serviceStartTime, visit.serviceEndTime)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <Link
-                      to={`/map/${visit.userId}`}
-                      className="text-blue-600 hover:text-blue-900 inline-flex items-center"
-                    >
-                      <MapPin className="h-4 w-4 mr-1" />
-                      Track
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        to={`/map/${visit.userId}`}
+                        className="text-blue-600 hover:text-blue-900 inline-flex items-center"
+                      >
+                        <MapPin className="h-4 w-4 mr-1" />
+                        Track
+                      </Link>
+                      {visit.status === ServiceStatus.PAUSED_NEXT_DAY && (
+                        <DialogTrigger
+                          asChild
+                          onClick={() => setSelectedVisit(visit)}
+                        >
+                          <Button variant="outline" size="sm">
+                            <Play className="h-4 w-4 mr-1" />
+                            Resume
+                          </Button>
+                        </DialogTrigger>
+                      )}
+                      {visit.status === ServiceStatus.BLOCKED && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => unblockVisitMutation.mutate(visit.id)}
+                          disabled={unblockVisitMutation.isPending}
+                        >
+                          <Ban className="h-4 w-4 mr-1" />
+                          Unblock
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

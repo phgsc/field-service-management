@@ -18,7 +18,8 @@ export interface IStorage {
   createVisit(visit: InsertVisit): Promise<Visit>;
   updateVisitStatus(id: string, update: Partial<Visit>): Promise<Visit>;
   getEngineers(): Promise<User[]>;
-  getAdmins(): Promise<User[]>; // Add this line
+  getAdmins(): Promise<User[]>;
+  getVisit(id: string): Promise<Visit | undefined>;
   sessionStore: session.Store;
 }
 
@@ -115,9 +116,13 @@ export class MongoStorage implements IStorage {
     return engineers.map(eng => convertDocument<User>(eng));
   }
 
-  async getAdmins(): Promise<User[]> { // Add this method
+  async getAdmins(): Promise<User[]> { 
     const admins = await UserModel.find({ isAdmin: true });
     return admins.map(admin => convertDocument<User>(admin));
+  }
+  async getVisit(id: string): Promise<Visit | undefined> {
+    const visit = await VisitModel.findById(id);
+    return visit ? convertDocument<Visit>(visit) : undefined;
   }
 }
 
