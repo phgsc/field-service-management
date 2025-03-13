@@ -161,8 +161,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const visit = await storage.getVisit(req.params.id);
       if (!visit) return res.status(404).send("Visit not found");
 
-      console.log("Visit UserID:", visit.userId);
-      console.log("Request UserID:", req.user.id);
 
       // Compare the string representations of the IDs
       if (visit.userId.toString() !== req.user.id.toString()) {
@@ -208,7 +206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : 0;
 
       const updateData = {
-        status: "completed",
+        status: ServiceStatus.COMPLETED, // Corrected to use enum
         endTime: now,
         serviceEndTime: now,
         totalServiceTime: (visit.totalServiceTime || 0) + serviceTimeInMinutes,
@@ -239,7 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : 0;
 
       const updateData: any = {
-        status: req.body.reason === "next_day" ? "paused_next_day" : "blocked",
+        status: req.body.reason === "next_day" ? ServiceStatus.PAUSED_NEXT_DAY : ServiceStatus.BLOCKED,
         endTime: now,
         serviceEndTime: now,
         totalServiceTime: (visit.totalServiceTime || 0) + serviceTimeInMinutes,
@@ -250,10 +248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.blockReason = req.body.blockReason;
       }
 
-      const updatedVisit = await storage.updateVisitStatus(
-        req.params.id,
-        updateData,
-      );
+      const updatedVisit = await storage.updateVisitStatus(req.params.id, updateData);
       res.json(updatedVisit);
     } catch (err) {
       res.status(500).send((err as Error).message);
@@ -268,22 +263,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!visit) return res.status(404).send("Visit not found");
 
       // Only allow resuming paused or blocked visits
-      if (
-        !["paused_next_day", "blocked"].includes(visit.status.toLowerCase())
-      ) {
-        return res
-          .status(400)
-          .send("Visit must be paused or blocked to resume");
+      if (![ServiceStatus.PAUSED_NEXT_DAY, ServiceStatus.BLOCKED].includes(visit.status)) {
+        return res.status(400).send("Visit must be paused or blocked to resume");
+      }
+
+      // Check authorization - admin can reassign, engineer can only modify own visits
+      if (!req.user.isAdmin && visit.userId.toString() !== req.user.id.toString()) {
+        return res.status(403).send("Not authorized to modify this visit");
       }
 
       const now = new Date();
       const updateData: Partial<Visit> = {
-        status: req.body.resumeType === "journey" ? "on_route" : "in_service",
+        status: req.body.resumeType === 'journey' ? ServiceStatus.ON_ROUTE : ServiceStatus.IN_SERVICE,
         endTime: null,
-        serviceEndTime: null,
+        serviceEndTime: null
       };
 
-      if (req.body.resumeType === "journey") {
+      // Handle engineer reassignment if admin is making the request
+      if (req.user.isAdmin && req.body.newEngineerId) {
+        updateData.userId = req.body.newEngineerId;
+      }
+
+      if (req.body.resumeType === 'journey') {
         updateData.journeyStartTime = now;
         updateData.journeyEndTime = null;
       } else {
@@ -291,10 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.serviceEndTime = null;
       }
 
-      const updatedVisit = await storage.updateVisitStatus(
-        req.params.id,
-        updateData,
-      );
+      const updatedVisit = await storage.updateVisitStatus(req.params.id, updateData);
       res.json(updatedVisit);
     } catch (err) {
       res.status(500).send((err as Error).message);
@@ -307,15 +305,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const visit = await storage.getVisit(req.params.id);
       if (!visit) return res.status(404).send("Visit not found");
 
-      if (visit.status !== "BLOCKED") {
+      // Check authorization - admin can reassign, engineer can only modify own visits
+      if (!req.user.isAdmin && visit.userId.toString() !== req.user.id.toString()) {
+        return res.status(403).send("Not authorized to modify this visit");
+      }
+
+      if (visit.status !== ServiceStatus.BLOCKED) {
         return res.status(400).send("Visit must be blocked to unblock");
       }
 
-      const updatedVisit = await storage.updateVisitStatus(req.params.id, {
-        status: "NOT_STARTED",
+      const updateData: Partial<Visit> = {
+        status: ServiceStatus.ON_ROUTE,
         blockReason: null,
-        blockedSince: null,
-      });
+        blockedSince: null
+      };
+
+      // Handle engineer reassignment if admin is making the request
+      if (req.user.isAdmin && req.body.newEngineerId) {
+        updateData.userId = req.body.newEngineerId;
+      }
+
+      const updatedVisit = await storage.updateVisitStatus(req.params.id, updateData);
       res.json(updatedVisit);
     } catch (err) {
       res.status(500).send((err as Error).message);

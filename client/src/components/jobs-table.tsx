@@ -10,21 +10,28 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { format, subMonths } from "date-fns";
 import { Calendar as CalendarIcon, MapPin, Play, Truck, Ban } from "lucide-react";
 import { useState } from "react";
-import { Visit, ServiceStatus } from "@shared/schema";
+import { Visit, ServiceStatus, User } from "@shared/schema";
 import { Link } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 
 type JobsTableProps = {
   visits: Visit[];
-  engineers: any[];
+  engineers: User[];
 };
 
 export function JobsTable({ visits, engineers }: JobsTableProps) {
@@ -32,16 +39,22 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
   const { toast } = useToast();
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedEngineerId, setSelectedEngineerId] = useState<string>("");
+  const { user: currentUser } = useAuth();
 
-  // Resume visit mutation
+  // Resume visit mutation with engineer reassignment for admin
   const resumeVisitMutation = useMutation({
-    mutationFn: async ({ visitId, resumeType }: { visitId: string; resumeType: 'journey' | 'service' }) => {
-      const res = await apiRequest("POST", `/api/visits/${visitId}/resume`, { resumeType });
+    mutationFn: async ({ visitId, resumeType, newEngineerId }: { visitId: string; resumeType: 'journey' | 'service'; newEngineerId?: string }) => {
+      const res = await apiRequest("POST", `/api/visits/${visitId}/resume`, { 
+        resumeType,
+        newEngineerId // This will be undefined for engineer users
+      });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/visits"] });
       setIsDialogOpen(false);
+      setSelectedEngineerId("");
       toast({ title: "Visit resumed successfully" });
     },
     onError: (error: Error) => {
@@ -53,14 +66,17 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
     }
   });
 
-  // Unblock visit mutation
+  // Unblock visit mutation with engineer reassignment for admin
   const unblockVisitMutation = useMutation({
-    mutationFn: async (visitId: string) => {
-      const res = await apiRequest("POST", `/api/visits/${visitId}/unblock`);
+    mutationFn: async ({ visitId, newEngineerId }: { visitId: string; newEngineerId?: string }) => {
+      const res = await apiRequest("POST", `/api/visits/${visitId}/unblock`, {
+        newEngineerId // This will be undefined for engineer users
+      });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/visits"] });
+      setSelectedEngineerId("");
       toast({ title: "Visit unblocked successfully" });
     },
     onError: (error: Error) => {
@@ -77,16 +93,6 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
     (visit) => new Date(visit.startTime) >= date
   );
 
-  // Helper function to calculate elapsed time
-  const getElapsedTime = (start?: Date, end?: Date) => {
-    if (!start) return "Not begun";
-    const endTime = end || new Date();
-    const elapsed = Math.floor(
-      (new Date(endTime).getTime() - new Date(start).getTime()) / (1000 * 60)
-    );
-    return `${elapsed} minutes`;
-  };
-
   // Helper function to get status-based style
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -102,6 +108,15 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
       default:
         return "bg-gray-100 text-gray-800";
     }
+  };
+
+  // Sort engineers with current engineer at top
+  const getSortedEngineers = (currentEngineerId: string) => {
+    return engineers.sort((a, b) => {
+      if (a.id === currentEngineerId) return -1;
+      if (b.id === currentEngineerId) return 1;
+      return (a.profile?.name || a.username).localeCompare(b.profile?.name || b.username);
+    });
   };
 
   return (
@@ -135,32 +150,109 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Resume Visit</DialogTitle>
+            <DialogTitle>
+              {selectedVisit?.status === ServiceStatus.BLOCKED ? "Unblock Visit" : "Resume Visit"}
+            </DialogTitle>
           </DialogHeader>
-          <div className="flex gap-4 justify-center">
-            <Button
-              onClick={() => {
-                if (selectedVisit) {
-                  resumeVisitMutation.mutate({ visitId: selectedVisit.id, resumeType: 'journey' });
-                }
-              }}
-              disabled={resumeVisitMutation.isPending}
-            >
-              <Truck className="mr-2 h-4 w-4" />
-              Resume Journey
-            </Button>
-            <Button
-              onClick={() => {
-                if (selectedVisit) {
-                  resumeVisitMutation.mutate({ visitId: selectedVisit.id, resumeType: 'service' });
-                }
-              }}
-              disabled={resumeVisitMutation.isPending}
-            >
-              <Play className="mr-2 h-4 w-4" />
-              Resume Service
-            </Button>
-          </div>
+          {currentUser?.isAdmin ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Assign Engineer</label>
+                <Select
+                  value={selectedEngineerId}
+                  onValueChange={setSelectedEngineerId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an engineer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedVisit && getSortedEngineers(selectedVisit.userId).map((engineer) => (
+                      <SelectItem key={engineer.id} value={engineer.id}>
+                        {engineer.profile?.name || engineer.username}
+                        {engineer.id === selectedVisit.userId && " (Current)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedVisit?.status === ServiceStatus.BLOCKED ? (
+                <Button
+                  className="w-full"
+                  onClick={() => unblockVisitMutation.mutate({
+                    visitId: selectedVisit.id,
+                    newEngineerId: selectedEngineerId || undefined
+                  })}
+                  disabled={unblockVisitMutation.isPending}
+                >
+                  <Ban className="mr-2 h-4 w-4" />
+                  Unblock Visit
+                </Button>
+              ) : (
+                <div className="flex gap-4 justify-center">
+                  <Button
+                    onClick={() => {
+                      if (selectedVisit) {
+                        resumeVisitMutation.mutate({
+                          visitId: selectedVisit.id,
+                          resumeType: 'journey',
+                          newEngineerId: selectedEngineerId || undefined
+                        });
+                      }
+                    }}
+                    disabled={resumeVisitMutation.isPending}
+                  >
+                    <Truck className="mr-2 h-4 w-4" />
+                    Resume Journey
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (selectedVisit) {
+                        resumeVisitMutation.mutate({
+                          visitId: selectedVisit.id,
+                          resumeType: 'service',
+                          newEngineerId: selectedEngineerId || undefined
+                        });
+                      }
+                    }}
+                    disabled={resumeVisitMutation.isPending}
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    Resume Service
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            // Engineer view - simple resume/unblock without engineer selection
+            <div className="flex gap-4 justify-center">
+              {selectedVisit?.status === ServiceStatus.BLOCKED ? (
+                <Button
+                  onClick={() => unblockVisitMutation.mutate({
+                    visitId: selectedVisit.id
+                  })}
+                  disabled={unblockVisitMutation.isPending}
+                >
+                  <Ban className="mr-2 h-4 w-4" />
+                  Unblock Visit
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => {
+                    if (selectedVisit) {
+                      resumeVisitMutation.mutate({
+                        visitId: selectedVisit.id,
+                        resumeType: 'journey'
+                      });
+                    }
+                  }}
+                  disabled={resumeVisitMutation.isPending}
+                >
+                  <Play className="mr-2 h-4 w-4" />
+                  Resume Journey
+                </Button>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
