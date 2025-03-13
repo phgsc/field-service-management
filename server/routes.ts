@@ -114,10 +114,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/visits/start-journey", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     try {
+      // Check if user already has an active visit
+      const activeVisits = await storage.getVisits(req.user.id);
+      const hasActiveVisit = activeVisits.some(v =>
+        ['on_route', 'in_service'].includes(v.status.toLowerCase())
+      );
+
+      if (hasActiveVisit) {
+        return res.status(400).send("Cannot start new journey while another visit is active");
+      }
+
       const visit = await storage.createVisit({
         userId: req.user.id,
         jobId: req.body.jobId,
-        status: 'in_journey',
+        status: 'on_route',
         startTime: new Date(),
         journeyStartTime: new Date(),
         latitude: req.body.latitude,
@@ -134,6 +144,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const visit = await storage.getVisit(req.params.id);
       if (!visit) return res.status(404).send("Visit not found");
+
+      // Ensure the visit belongs to the current user
+      if (visit.userId !== req.user.id) {
+        return res.status(403).send("Not authorized to modify this visit");
+      }
 
       if (visit.status.toLowerCase() !== 'on_route') {
         return res.status(400).send("Visit must be on route to start service");

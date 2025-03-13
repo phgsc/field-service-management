@@ -256,9 +256,16 @@ export default function EngineerView() {
     }
   };
 
-  // Update the active visit check to include on_route status
+  // Update the active visit check to handle multiple jobs properly
   const activeVisit = visits?.find(v =>
-    ['on_route', 'in_service'].includes(v.status.toLowerCase())
+    ['on_route', 'in_service'].includes(v.status.toLowerCase()) &&
+    v.userId === user?.id
+  );
+
+  // Check if engineer has any active visits before allowing new ones
+  const hasActiveVisit = visits?.some(v =>
+    ['on_route', 'in_service'].includes(v.status.toLowerCase()) &&
+    v.userId === user?.id
   );
 
   return (
@@ -321,7 +328,7 @@ export default function EngineerView() {
               </span>
             </div>
 
-            {!activeVisit ? (
+            {!hasActiveVisit ? (
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="jobId">Job ID</Label>
