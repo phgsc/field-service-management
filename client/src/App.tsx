@@ -8,6 +8,7 @@ import Dashboard from "@/pages/dashboard";
 import EngineerView from "@/pages/engineer-view";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
+import MapView from "@/pages/map-view";
 
 function Router() {
   return (
@@ -15,6 +16,7 @@ function Router() {
       <Route path="/auth" component={AuthPage} />
       <ProtectedRoute path="/" component={Dashboard} />
       <ProtectedRoute path="/engineer" component={EngineerView} />
+      <ProtectedRoute path="/map/:engineerId" component={MapView} />
       <Route component={NotFound} />
     </Switch>
   );

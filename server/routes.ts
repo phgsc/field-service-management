@@ -61,13 +61,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Password reset route (admin only)
+  // Get single engineer details
+  app.get("/api/engineers/:id", requireAdmin, async (req, res) => {
+    try {
+      const engineer = await storage.getUser(req.params.id);
+      if (!engineer) return res.status(404).send("Engineer not found");
+      res.json(engineer);
+    } catch (err) {
+      res.status(500).send((err as Error).message);
+    }
+  });
+
+
+  // Update existing reset password route to allow admin-to-admin resets
   app.post("/api/engineers/:id/reset-password", requireAdmin, async (req, res) => {
     try {
       const { newPassword } = resetPasswordSchema.parse(req.body);
-      const user = await storage.resetUserPassword(req.params.id, newPassword);
-      if (!user) return res.status(404).send("Engineer not found");
-      res.json({ message: "Password reset successful" });
+
+      // Get the target user
+      const targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) return res.status(404).send("Engineer not found");
+
+      // Allow reset if:
+      // 1. Target is not an admin, or
+      // 2. Target is an admin but the requester is also an admin
+      if (!targetUser.isAdmin || (targetUser.isAdmin && req.user?.isAdmin)) {
+        const user = await storage.resetUserPassword(req.params.id, newPassword);
+        return res.json({ message: "Password reset successful" });
+      }
+
+      res.status(403).send("Not authorized to reset this user's password");
     } catch (err) {
       res.status(500).send((err as Error).message);
     }

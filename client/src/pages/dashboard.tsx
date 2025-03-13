@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { JobsTable } from "@/components/jobs-table"; // Added import
+
 
 // Add CreateEngineerForm component
 function CreateEngineerForm({ onSuccess }: { onSuccess: () => void }) {
@@ -257,6 +259,8 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
+            <JobsTable visits={visits || []} engineers={engineers || []} /> {/* Added JobsTable */}
+
             <div className="space-y-2">
               <h3 className="font-semibold">Field Engineers</h3>
               {engineers?.map((engineer) => {
@@ -316,7 +320,13 @@ export default function Dashboard() {
                                    if (!open) setSelectedEngineer(null);
                                  }}>
                             <DialogTrigger asChild>
-                              <Button variant="outline" size="sm" onClick={() => setSelectedEngineer(engineer)}>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setSelectedEngineer(engineer)}
+                                // Only show reset button for non-self admin users
+                                disabled={engineer.id === user?.id || !engineer.isAdmin}
+                              >
                                 <Key className="h-4 w-4" />
                               </Button>
                             </DialogTrigger>
