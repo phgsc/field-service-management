@@ -190,12 +190,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!visit) return res.status(404).send("Visit not found");
 
       // Only allow resuming paused or blocked visits
-      if (!['PAUSED_NEXT_DAY', 'BLOCKED'].includes(visit.status)) {
+      if (!['paused_next_day', 'blocked'].includes(visit.status.toLowerCase())) {
         return res.status(400).send("Visit must be paused or blocked to resume");
       }
 
       const updateData = {
-        status: req.body.resumeType === 'journey' ? 'ON_ROUTE' : 'IN_SERVICE',
+        status: req.body.resumeType === 'journey' ? 'on_route' : 'in_service',
         endTime: null,
         serviceEndTime: null,
       };

@@ -231,29 +231,28 @@ export default function EngineerView() {
     },
   });
 
-  const activeVisit = visits?.find(v =>
-    v.status === ServiceStatus.IN_JOURNEY ||
-    v.status === ServiceStatus.IN_SERVICE
-  );
-
   // Helper function to get status-based style
   const getStatusStyle = (status: string) => {
-    switch (status) {
-      case ServiceStatus.COMPLETED:
+    switch (status.toLowerCase()) {
+      case 'completed':
         return "bg-green-500/10 text-green-500";
-      case ServiceStatus.ON_ROUTE:
+      case 'on_route':
         return "bg-blue-500/10 text-blue-500";
-      case ServiceStatus.IN_SERVICE:
+      case 'in_service':
         return "bg-yellow-500/10 text-yellow-500";
-      case ServiceStatus.PAUSED_NEXT_DAY:
+      case 'paused_next_day':
         return "bg-yellow-500/10 text-yellow-500";
-      case ServiceStatus.BLOCKED:
+      case 'blocked':
         return "bg-red-500/10 text-red-500";
       default:
         return "bg-gray-500/10 text-gray-500";
     }
   };
 
+  // Update the active visit check
+  const activeVisit = visits?.find(v =>
+    ['on_route', 'in_service'].includes(v.status.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-background p-4">
