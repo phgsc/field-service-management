@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { ServiceStatus } from '@shared/schema';
 
 // Try to use MONGODB_URI if provided, otherwise use local MongoDB
 const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/field-service-db';
@@ -48,8 +49,8 @@ const visitSchema = new mongoose.Schema({
   status: { 
     type: String, 
     required: true,
-    enum: ['not_started', 'in_journey', 'in_service', 'completed', 'paused_next_day', 'blocked'],
-    default: 'not_started'
+    enum: Object.values(ServiceStatus),
+    default: ServiceStatus.NOT_STARTED
   },
   startTime: { type: Date, required: true },
   endTime: { type: Date },

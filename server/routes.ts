@@ -6,6 +6,7 @@ import {
   insertUserSchema,
   updateProfileSchema,
   resetPasswordSchema,
+  ServiceStatus,
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -129,7 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user already has an active visit
       const activeVisits = await storage.getVisits(req.user.id);
       const hasActiveVisit = activeVisits.some(v =>
-        ['on_route', 'in_service'].includes(v.status.toLowerCase())
+        [ServiceStatus.ON_ROUTE, ServiceStatus.IN_SERVICE].includes(v.status)
       );
 
       if (hasActiveVisit) {
@@ -139,7 +140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const visit = await storage.createVisit({
         userId: req.user.id,
         jobId: req.body.jobId,
-        status: 'on_route',
+        status: ServiceStatus.ON_ROUTE,
         startTime: new Date(),
         journeyStartTime: new Date(),
         latitude: req.body.latitude,
@@ -163,7 +164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).send("Not authorized to modify this visit");
       }
 
-      if (visit.status.toLowerCase() !== 'on_route') {
+      if (visit.status !== ServiceStatus.ON_ROUTE) {
         return res.status(400).send("Visit must be on route to start service");
       }
 
@@ -172,7 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Math.floor((now.getTime() - new Date(visit.journeyStartTime).getTime()) / (1000 * 60)) : 0;
 
       const updateData: Partial<Visit> = {
-        status: 'in_service',
+        status: ServiceStatus.IN_SERVICE,
         journeyEndTime: now,
         serviceStartTime: now,
         totalJourneyTime: (visit.totalJourneyTime || 0) + journeyTimeInMinutes

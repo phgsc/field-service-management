@@ -241,16 +241,16 @@ export default function EngineerView() {
 
   // Helper function to get status-based style
   const getStatusStyle = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'completed':
+    switch (status) {
+      case ServiceStatus.COMPLETED:
         return "bg-green-500/10 text-green-500";
-      case 'on_route':
+      case ServiceStatus.ON_ROUTE:
         return "bg-blue-500/10 text-blue-500";
-      case 'in_service':
+      case ServiceStatus.IN_SERVICE:
         return "bg-yellow-500/10 text-yellow-500";
-      case 'paused_next_day':
+      case ServiceStatus.PAUSED_NEXT_DAY:
         return "bg-yellow-500/10 text-yellow-500";
-      case 'blocked':
+      case ServiceStatus.BLOCKED:
         return "bg-red-500/10 text-red-500";
       default:
         return "bg-gray-500/10 text-gray-500";
@@ -259,13 +259,13 @@ export default function EngineerView() {
 
   // Update the active visit check to handle multiple jobs properly
   const activeVisit = visits?.find(v =>
-    ['on_route', 'in_service'].includes(v.status.toLowerCase()) &&
+    [ServiceStatus.ON_ROUTE, ServiceStatus.IN_SERVICE].includes(v.status as keyof typeof ServiceStatus) &&
     v.userId === user?.id
   );
 
   // Check if engineer has any active visits before allowing new ones
   const hasActiveVisit = visits?.some(v =>
-    ['on_route', 'in_service'].includes(v.status.toLowerCase()) &&
+    [ServiceStatus.ON_ROUTE, ServiceStatus.IN_SERVICE].includes(v.status as keyof typeof ServiceStatus) &&
     v.userId === user?.id
   );
 
@@ -367,7 +367,7 @@ export default function EngineerView() {
                     <Timer className="h-5 w-5 text-primary" />
                   </div>
 
-                  {activeVisit.status === 'ON_ROUTE' && (
+                  {activeVisit.status === ServiceStatus.ON_ROUTE && (
                     <Button
                       className="w-full"
                       onClick={() => startServiceMutation.mutate(activeVisit.id)}
@@ -382,7 +382,7 @@ export default function EngineerView() {
                     </Button>
                   )}
 
-                  {activeVisit.status === 'IN_SERVICE' && (
+                  {activeVisit.status === ServiceStatus.IN_SERVICE && (
                     <div className="space-y-2">
                       <Button
                         className="w-full"
