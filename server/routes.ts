@@ -80,17 +80,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get the target user
       const targetUser = await storage.getUser(req.params.id);
-      if (!targetUser) return res.status(404).send("Engineer not found");
+      if (!targetUser) return res.status(404).send("User not found");
 
-      // Allow reset if:
-      // 1. Target is not an admin, or
-      // 2. Target is an admin but the requester is also an admin
-      if (!targetUser.isAdmin || (targetUser.isAdmin && req.user?.isAdmin)) {
-        const user = await storage.resetUserPassword(req.params.id, newPassword);
-        return res.json({ message: "Password reset successful" });
+      // Prevent self reset through this endpoint
+      if (targetUser.id === req.user?.id) {
+        return res.status(403).send("Cannot reset your own password through this endpoint");
       }
 
-      res.status(403).send("Not authorized to reset this user's password");
+      const user = await storage.resetUserPassword(req.params.id, newPassword);
+      return res.json({ message: "Password reset successful" });
     } catch (err) {
       res.status(500).send((err as Error).message);
     }
