@@ -1,11 +1,9 @@
 import mongoose from 'mongoose';
 
-if (!process.env.MONGODB_URI) {
-  throw new Error("MONGODB_URI must be set");
-}
+// Try to use MONGODB_URI if provided, otherwise use local MongoDB
+const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/field-service-db';
 
 // Validate MongoDB URI format
-const uri = process.env.MONGODB_URI;
 if (!uri.startsWith('mongodb://') && !uri.startsWith('mongodb+srv://')) {
   throw new Error("Invalid MongoDB URI format. Must start with mongodb:// or mongodb+srv://");
 }
