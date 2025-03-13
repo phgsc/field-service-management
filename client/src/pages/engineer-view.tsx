@@ -102,7 +102,8 @@ export default function EngineerView() {
   const { toast } = useToast();
 
   const { data: visits } = useQuery<Visit[]>({
-    queryKey: ["/api/visits"],
+    queryKey: [`/api/visits`, user?.id], // Added user ID to query key for caching and refetching
+    enabled: !!user?.id // Only run query if user is logged in
   });
 
   // Location tracking interval
@@ -157,7 +158,7 @@ export default function EngineerView() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/visits"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/visits", user?.id] }); //Invalidate with user ID
       setIsResumeDialogOpen(false);
       toast({ title: "Visit resumed successfully" });
     },
@@ -177,7 +178,7 @@ export default function EngineerView() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/visits"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/visits", user?.id] }); //Invalidate with user ID
       toast({ title: "Visit unblocked successfully" });
     },
   });
@@ -193,7 +194,7 @@ export default function EngineerView() {
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/visits"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/visits", user?.id] }); //Invalidate with user ID
       toast({ title: "Journey started" });
     },
   });
@@ -204,7 +205,7 @@ export default function EngineerView() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/visits"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/visits", user?.id] }); //Invalidate with user ID
       toast({ title: "Service started successfully" });
     },
     onError: (error: Error) => {
@@ -222,7 +223,7 @@ export default function EngineerView() {
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/visits"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/visits", user?.id] }); //Invalidate with user ID
       toast({ title: "Service completed" });
     },
   });
@@ -233,7 +234,7 @@ export default function EngineerView() {
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/visits"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/visits", user?.id] }); //Invalidate with user ID
       toast({ title: "Service paused" });
     },
   });
@@ -258,13 +259,13 @@ export default function EngineerView() {
 
   // Update the active visit check to handle multiple jobs properly
   const activeVisit = visits?.find(v =>
-    ['on_route', 'in_service'].includes(v.status.toLowerCase()) &&
+    ['ON_ROUTE', 'IN_SERVICE'].includes(v.status) &&
     v.userId === user?.id
   );
 
   // Check if engineer has any active visits before allowing new ones
   const hasActiveVisit = visits?.some(v =>
-    ['on_route', 'in_service'].includes(v.status.toLowerCase()) &&
+    ['ON_ROUTE', 'IN_SERVICE'].includes(v.status) &&
     v.userId === user?.id
   );
 
@@ -353,7 +354,7 @@ export default function EngineerView() {
                   Start Journey
                 </Button>
               </div>
-            ) : (
+            ) : activeVisit ? (
               <Card className="bg-accent/50">
                 <CardContent className="pt-6 space-y-4">
                   <div className="flex justify-between items-center">
@@ -366,7 +367,7 @@ export default function EngineerView() {
                     <Timer className="h-5 w-5 text-primary" />
                   </div>
 
-                  {activeVisit.status.toLowerCase() === 'on_route' && (
+                  {activeVisit.status === 'ON_ROUTE' && (
                     <Button
                       className="w-full"
                       onClick={() => startServiceMutation.mutate(activeVisit.id)}
@@ -381,7 +382,7 @@ export default function EngineerView() {
                     </Button>
                   )}
 
-                  {activeVisit.status.toLowerCase() === 'in_service' && (
+                  {activeVisit.status === 'IN_SERVICE' && (
                     <div className="space-y-2">
                       <Button
                         className="w-full"
@@ -438,116 +439,85 @@ export default function EngineerView() {
                   )}
                 </CardContent>
               </Card>
-            )}
-
-            <Dialog open={isResumeDialogOpen} onOpenChange={setIsResumeDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Resume Visit</DialogTitle>
-                </DialogHeader>
-                <div className="flex gap-4 justify-center">
-                  <Button
-                    onClick={() => {
-                      if (selectedVisit) {
-                        resumeVisitMutation.mutate({ visitId: selectedVisit.id, resumeType: 'journey' });
-                      }
-                    }}
-                    disabled={resumeVisitMutation.isPending}
-                  >
-                    <Truck className="mr-2 h-4 w-4" />
-                    Resume Journey
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      if (selectedVisit) {
-                        resumeVisitMutation.mutate({ visitId: selectedVisit.id, resumeType: 'service' });
-                      }
-                    }}
-                    disabled={resumeVisitMutation.isPending}
-                  >
-                    <Play className="mr-2 h-4 w-4" />
-                    Resume Service
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            ) : null}
 
             <div className="space-y-2">
               <h3 className="font-semibold">Recent Visits</h3>
-              {visits?.map((visit) => (
-                <div
-                  key={visit.id}
-                  className="rounded border p-2 text-sm space-y-1"
-                >
-                  <div className="flex justify-between">
-                    <span className="font-medium">Job ID: {visit.jobId}</span>
-                    <div className={`px-2 py-0.5 rounded text-xs ${getStatusStyle(visit.status)}`}>
-                      {visit.status}
+              {visits?.filter(visit => visit.userId === user?.id)
+                .map((visit) => (
+                  <div
+                    key={visit.id}
+                    className="rounded border p-2 text-sm space-y-1"
+                  >
+                    <div className="flex justify-between">
+                      <span className="font-medium">Job ID: {visit.jobId}</span>
+                      <div className={`px-2 py-0.5 rounded text-xs ${getStatusStyle(visit.status)}`}>
+                        {visit.status}
+                      </div>
                     </div>
-                  </div>
 
-                  <div>Start: {format(new Date(visit.startTime), "PPp")}</div>
-                  {visit.endTime && (
-                    <div>End: {format(new Date(visit.endTime), "PPp")}</div>
-                  )}
+                    <div>Start: {format(new Date(visit.startTime), "PPp")}</div>
+                    {visit.endTime && (
+                      <div>End: {format(new Date(visit.endTime), "PPp")}</div>
+                    )}
 
-                  {visit.totalJourneyTime && (
+                    {visit.totalJourneyTime && (
+                      <div className="text-muted-foreground">
+                        Journey Time: {Math.round(visit.totalJourneyTime)} minutes
+                      </div>
+                    )}
+
+                    {visit.totalServiceTime && (
+                      <div className="text-muted-foreground">
+                        Service Time: {Math.round(visit.totalServiceTime)} minutes
+                      </div>
+                    )}
+
                     <div className="text-muted-foreground">
-                      Journey Time: {Math.round(visit.totalJourneyTime)} minutes
+                      Location: {visit.latitude}, {visit.longitude}
                     </div>
-                  )}
 
-                  {visit.totalServiceTime && (
-                    <div className="text-muted-foreground">
-                      Service Time: {Math.round(visit.totalServiceTime)} minutes
-                    </div>
-                  )}
+                    {(visit.status === ServiceStatus.PAUSED_NEXT_DAY || visit.status === ServiceStatus.BLOCKED) && (
+                      <div className="flex gap-2 mt-2">
+                        {visit.status === ServiceStatus.PAUSED_NEXT_DAY && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedVisit(visit);
+                              setIsResumeDialogOpen(true);
+                            }}
+                          >
+                            <Play className="h-4 w-4 mr-1" />
+                            Resume
+                          </Button>
+                        )}
+                        {visit.status === ServiceStatus.BLOCKED && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => unblockVisitMutation.mutate(visit.id)}
+                            disabled={unblockVisitMutation.isPending}
+                          >
+                            <Ban className="h-4 w-4 mr-1" />
+                            Unblock
+                          </Button>
+                        )}
+                      </div>
+                    )}
 
-                  <div className="text-muted-foreground">
-                    Location: {visit.latitude}, {visit.longitude}
+                    {visit.status === ServiceStatus.BLOCKED && visit.blockedSince && (
+                      <div className="text-red-500">
+                        Blocked for: {
+                          Math.ceil(
+                            (new Date().getTime() - new Date(visit.blockedSince).getTime()) /
+                            (1000 * 60 * 60 * 24)
+                          )
+                        } days
+                      </div>
+                    )}
                   </div>
-
-                  {(visit.status === ServiceStatus.PAUSED_NEXT_DAY || visit.status === ServiceStatus.BLOCKED) && (
-                    <div className="flex gap-2 mt-2">
-                      {visit.status === ServiceStatus.PAUSED_NEXT_DAY && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedVisit(visit);
-                            setIsResumeDialogOpen(true);
-                          }}
-                        >
-                          <Play className="h-4 w-4 mr-1" />
-                          Resume
-                        </Button>
-                      )}
-                      {visit.status === ServiceStatus.BLOCKED && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => unblockVisitMutation.mutate(visit.id)}
-                          disabled={unblockVisitMutation.isPending}
-                        >
-                          <Ban className="h-4 w-4 mr-1" />
-                          Unblock
-                        </Button>
-                      )}
-                    </div>
-                  )}
-
-                  {visit.status === ServiceStatus.BLOCKED && visit.blockedSince && (
-                    <div className="text-red-500">
-                      Blocked for: {
-                        Math.ceil(
-                          (new Date().getTime() - new Date(visit.blockedSince).getTime()) /
-                          (1000 * 60 * 60 * 24)
-                        )
-                      } days
-                    </div>
-                  )}
-                </div>
-              ))}
+                ))}
             </div>
           </div>
         </CardContent>

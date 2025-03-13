@@ -150,7 +150,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).send("Not authorized to modify this visit");
       }
 
-      if (visit.status.toLowerCase() !== 'on_route') {
+      // Check if the visit is in the correct state for starting service
+      if (!['ON_ROUTE', 'on_route'].includes(visit.status)) {
         return res.status(400).send("Visit must be on route to start service");
       }
 
@@ -159,7 +160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Math.floor((now.getTime() - new Date(visit.journeyStartTime).getTime()) / (1000 * 60)) : 0;
 
       const updateData: Partial<Visit> = {
-        status: 'in_service',
+        status: 'IN_SERVICE',
         journeyEndTime: now,
         serviceStartTime: now,
         totalJourneyTime: (visit.totalJourneyTime || 0) + journeyTimeInMinutes
