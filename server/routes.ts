@@ -140,7 +140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const now = new Date();
-      const journeyTimeInMinutes = visit.journeyStartTime ? 
+      const journeyTimeInMinutes = visit.journeyStartTime ?
         Math.floor((now.getTime() - new Date(visit.journeyStartTime).getTime()) / (1000 * 60)) : 0;
 
       const updateData: Partial<Visit> = {
@@ -157,16 +157,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update the complete route to accumulate service time
   app.post("/api/visits/:id/complete", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     try {
-      const visit = await storage.updateVisitStatus(req.params.id, {
+      const visit = await storage.getVisit(req.params.id);
+      if (!visit) return res.status(404).send("Visit not found");
+
+      const now = new Date();
+      const serviceTimeInMinutes = visit.serviceStartTime ?
+        Math.floor((now.getTime() - new Date(visit.serviceStartTime).getTime()) / (1000 * 60)) : 0;
+
+      const updateData = {
         status: 'completed',
-        endTime: new Date(),
-        serviceEndTime: new Date(),
-        totalServiceTime: req.body.totalServiceTime,
-      });
-      res.json(visit);
+        endTime: now,
+        serviceEndTime: now,
+        totalServiceTime: (visit.totalServiceTime || 0) + serviceTimeInMinutes
+      };
+
+      const updatedVisit = await storage.updateVisitStatus(req.params.id, updateData);
+      res.json(updatedVisit);
     } catch (err) {
       res.status(500).send((err as Error).message);
     }
@@ -175,12 +185,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/visits/:id/pause", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     try {
+      const visit = await storage.getVisit(req.params.id);
+      if (!visit) return res.status(404).send("Visit not found");
+
       const now = new Date();
-      const updateData = {
+      const serviceTimeInMinutes = visit.serviceStartTime ?
+        Math.floor((now.getTime() - new Date(visit.serviceStartTime).getTime()) / (1000 * 60)) : 0;
+
+      const updateData: any = {
         status: req.body.reason === 'next_day' ? 'paused_next_day' : 'blocked',
         endTime: now,
         serviceEndTime: now,
-        totalServiceTime: req.body.totalServiceTime,
+        totalServiceTime: (visit.totalServiceTime || 0) + serviceTimeInMinutes
       };
 
       if (req.body.reason === 'blocked') {
@@ -188,8 +204,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.blockReason = req.body.blockReason;
       }
 
-      const visit = await storage.updateVisitStatus(req.params.id, updateData);
-      res.json(visit);
+      const updatedVisit = await storage.updateVisitStatus(req.params.id, updateData);
+      res.json(updatedVisit);
     } catch (err) {
       res.status(500).send((err as Error).message);
     }
