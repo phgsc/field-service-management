@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import Dashboard from "@/pages/dashboard";
 import JobsPage from "@/pages/jobs-page";
+import AdminUsersPage from "@/pages/admin-users";
 import EngineerView from "@/pages/engineer-view";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/auth" component={AuthPage} />
       <ProtectedRoute path="/" component={Dashboard} />
       <ProtectedRoute path="/jobs" component={JobsPage} />
+      <ProtectedRoute path="/admin-users" component={AdminUsersPage} />
       <ProtectedRoute path="/engineer" component={EngineerView} />
       <ProtectedRoute path="/map/:engineerId" component={MapView} />
       <Route component={NotFound} />

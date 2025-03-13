@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Visit, User } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { AdminNav } from "@/components/admin-nav";
 
 export default function JobsPage() {
   const { user, logoutMutation } = useAuth();
@@ -19,6 +20,7 @@ export default function JobsPage() {
 
   return (
     <div className="min-h-screen bg-background p-4">
+      <AdminNav />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Jobs Overview</CardTitle>

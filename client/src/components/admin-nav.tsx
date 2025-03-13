@@ -22,6 +22,14 @@ export function AdminNav() {
           Jobs
         </a>
       </Link>
+      <Link href="/admin-users">
+        <a className={cn(
+          "px-3 py-2 rounded-lg hover:bg-accent",
+          location === "/admin-users" ? "bg-accent" : "transparent"
+        )}>
+          Admin Users
+        </a>
+      </Link>
     </nav>
   );
 }
