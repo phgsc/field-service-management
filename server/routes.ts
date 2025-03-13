@@ -129,12 +129,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Check if user already has an active visit
       const activeVisits = await storage.getVisits(req.user.id);
-      const hasActiveVisit = activeVisits.some(v =>
-        [ServiceStatus.ON_ROUTE, ServiceStatus.IN_SERVICE].includes(v.status)
+      const hasActiveVisit = activeVisits.some((v) =>
+        [ServiceStatus.ON_ROUTE, ServiceStatus.IN_SERVICE].includes(v.status),
       );
 
       if (hasActiveVisit) {
-        return res.status(400).send("Cannot start new journey while another visit is active");
+        return res
+          .status(400)
+          .send("Cannot start new journey while another visit is active");
       }
 
       const visit = await storage.createVisit({
@@ -159,8 +161,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const visit = await storage.getVisit(req.params.id);
       if (!visit) return res.status(404).send("Visit not found");
 
-      // Ensure the visit belongs to the current user
-      if (visit.userId !== req.user.id) {
+      console.log("Visit UserID:", visit.userId);
+      console.log("Request UserID:", req.user.id);
+
+      // Compare the string representations of the IDs
+      if (visit.userId.toString() !== req.user.id.toString()) {
         return res.status(403).send("Not authorized to modify this visit");
       }
 
@@ -182,6 +187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedVisit = await storage.updateVisitStatus(req.params.id, updateData);
       res.json(updatedVisit);
     } catch (err) {
+      console.error("Start service error:", err);
       res.status(500).send((err as Error).message);
     }
   });
