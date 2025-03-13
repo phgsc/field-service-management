@@ -117,7 +117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user already has an active visit
       const activeVisits = await storage.getVisits(req.user.id);
       const hasActiveVisit = activeVisits.some(v =>
-        ['on_route', 'in_service'].includes(v.status.toLowerCase())
+        ['ON_ROUTE', 'IN_SERVICE'].includes(v.status)
       );
 
       if (hasActiveVisit) {
@@ -127,7 +127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const visit = await storage.createVisit({
         userId: req.user.id,
         jobId: req.body.jobId,
-        status: 'on_route',
+        status: 'ON_ROUTE',
         startTime: new Date(),
         journeyStartTime: new Date(),
         latitude: req.body.latitude,
@@ -151,7 +151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if the visit is in the correct state for starting service
-      if (!['ON_ROUTE', 'on_route'].includes(visit.status)) {
+      if (visit.status !== 'ON_ROUTE') {
         return res.status(400).send("Visit must be on route to start service");
       }
 

@@ -241,16 +241,16 @@ export default function EngineerView() {
 
   // Helper function to get status-based style
   const getStatusStyle = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'completed':
+    switch (status) {
+      case 'COMPLETED':
         return "bg-green-500/10 text-green-500";
-      case 'on_route':
+      case 'ON_ROUTE':
         return "bg-blue-500/10 text-blue-500";
-      case 'in_service':
+      case 'IN_SERVICE':
         return "bg-yellow-500/10 text-yellow-500";
-      case 'paused_next_day':
+      case 'PAUSED_NEXT_DAY':
         return "bg-yellow-500/10 text-yellow-500";
-      case 'blocked':
+      case 'BLOCKED':
         return "bg-red-500/10 text-red-500";
       default:
         return "bg-gray-500/10 text-gray-500";
