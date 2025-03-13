@@ -65,8 +65,7 @@ export default function AdminUsersPage() {
   const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
 
   const { data: admins } = useQuery<User[]>({
-    queryKey: ["/api/engineers"],
-    select: (users) => users.filter(u => u.isAdmin)
+    queryKey: ["/api/admins"],
   });
 
   return (

@@ -213,6 +213,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add this new route after the existing /api/engineers route
+  app.get("/api/admins", requireAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAdmins();
+      res.json(users);
+    } catch (err) {
+      res.status(500).send((err as Error).message);
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
