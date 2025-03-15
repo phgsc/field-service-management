@@ -22,6 +22,14 @@ export function AdminNav() {
           Jobs
         </a>
       </Link>
+      <Link href="/admin-calendar">
+        <a className={cn(
+          "px-3 py-2 rounded-lg hover:bg-accent",
+          location === "/admin-calendar" ? "bg-accent" : "transparent"
+        )}>
+          Schedule
+        </a>
+      </Link>
       <Link href="/admin-users">
         <a className={cn(
           "px-3 py-2 rounded-lg hover:bg-accent",

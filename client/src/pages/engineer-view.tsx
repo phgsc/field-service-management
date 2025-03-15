@@ -9,12 +9,13 @@ import { Visit, ServiceStatus } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Loader2, MapPin, Play, Square, UserCircle,
-  Timer, AlertTriangle, CheckCircle, PauseCircle, Key, Truck, Ban
+  Timer, AlertTriangle, CheckCircle, PauseCircle, Key, Truck, Ban, Calendar as CalendarIcon
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 
 // Profile Edit Form Component
 function ProfileEditForm({ onSuccess }: { onSuccess: () => void }) {
@@ -303,6 +304,13 @@ export default function EngineerView() {
                 <PasswordChangeForm onSuccess={() => setIsChangePasswordOpen(false)} />
               </DialogContent>
             </Dialog>
+
+            <Link href="/engineer-calendar">
+              <Button variant="outline" className="cursor-pointer">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                My Schedule
+              </Button>
+            </Link>
 
             <Button
               variant="destructive"
