@@ -25,7 +25,7 @@ export const TASK_TYPES = {
 export type TaskType = keyof typeof TASK_TYPES;
 
 interface ScheduleCalendarProps {
-  engineerId?: string; // Optional - if not provided, shows all engineers
+  engineerId?: string;
   events: Array<{
     id: string;
     title: string;
@@ -72,7 +72,7 @@ export function ScheduleCalendar({ engineerId, events, onEventAdd, isAdmin }: Sc
       await onEventAdd({
         start: selectInfo.start,
         end: selectInfo.end,
-        type: 'admin', // Default type, can be changed in a modal
+        type: 'admin', // Default type, can be changed in modal
         allDay: selectInfo.allDay,
       });
     } catch (error) {
@@ -88,31 +88,45 @@ export function ScheduleCalendar({ engineerId, events, onEventAdd, isAdmin }: Sc
     <Card className="p-4">
       <style>
         {`
-          .fc-toolbar-title {
-            color: hsl(var(--foreground)) !important;
+          .fc {
+            --fc-border-color: hsl(var(--border));
+            --fc-button-text-color: hsl(var(--primary-foreground));
+            --fc-button-bg-color: hsl(var(--primary));
+            --fc-button-border-color: hsl(var(--primary));
+            --fc-button-hover-bg-color: hsl(var(--primary));
+            --fc-button-hover-border-color: hsl(var(--primary));
+            --fc-button-active-bg-color: hsl(var(--accent));
+            --fc-button-active-border-color: hsl(var(--accent));
           }
+
+          .fc .fc-toolbar-title {
+            color: hsl(var(--foreground));
+            font-weight: 600;
+          }
+
           .fc th {
-            color: hsl(var(--foreground)) !important;
+            color: hsl(var(--foreground));
+            font-weight: 500;
+            padding: 8px;
+            background-color: hsl(var(--muted));
           }
+
+          .fc-theme-standard td {
+            border-color: hsl(var(--border));
+          }
+
           .fc-timegrid-axis-cushion,
           .fc-timegrid-slot-label-cushion {
-            color: hsl(var(--foreground)) !important;
+            color: hsl(var(--foreground));
           }
+
           .fc-day-today {
-            background-color: hsl(var(--accent)) !important;
-            opacity: 0.1;
+            background-color: hsl(var(--accent) / 0.1) !important;
           }
-          .fc-button {
-            background-color: hsl(var(--primary)) !important;
-            border-color: hsl(var(--primary)) !important;
-          }
-          .fc-button:hover {
-            background-color: hsl(var(--primary)) !important;
-            opacity: 0.9;
-          }
-          .fc-button-active {
-            background-color: hsl(var(--accent)) !important;
-            border-color: hsl(var(--accent)) !important;
+
+          .fc-event {
+            border-radius: 4px;
+            padding: 2px;
           }
         `}
       </style>

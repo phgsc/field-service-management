@@ -20,13 +20,21 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-interface NewTaskFormData {
-  title: string;
-  type: TaskType;
-}
+const taskSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  type: z.enum([
+    'journey', 'service', 'admin', 'sales-call', 'sales-visit', 
+    'research', 'day-off', 'vacation', 'public-holiday', 
+    'weekly-off', 'in-office'
+  ] as const)
+});
+
+type TaskFormData = z.infer<typeof taskSchema>;
 
 export default function EngineerCalendarView() {
   const { user } = useAuth();
@@ -38,19 +46,67 @@ export default function EngineerCalendarView() {
     allDay: boolean;
   } | null>(null);
 
-  const form = useForm<NewTaskFormData>({
+  const form = useForm<TaskFormData>({
+    resolver: zodResolver(taskSchema),
     defaultValues: {
       title: "",
       type: "admin"
     }
   });
 
-  // Fetch engineer's schedules
-  const { data: schedules, isLoading } = useQuery({
+  // Fetch engineer's schedules and visits
+  const { data: schedules, isLoading: isLoadingSchedules } = useQuery({
     queryKey: ["/api/schedules", user?.id],
     enabled: !!user?.id,
-    refetchInterval: 30000, // Refresh every 30 seconds
   });
+
+  const { data: visits, isLoading: isLoadingVisits } = useQuery({
+    queryKey: ["/api/visits", user?.id],
+    enabled: !!user?.id,
+  });
+
+  // Combine schedules and visits into events
+  const events = useMemo(() => {
+    const allEvents = [];
+
+    // Add regular schedules
+    if (schedules) {
+      allEvents.push(...schedules);
+    }
+
+    // Add visits as events
+    if (visits) {
+      visits.forEach(visit => {
+        // Add journey time
+        if (visit.journeyStartTime && visit.journeyEndTime) {
+          allEvents.push({
+            id: `journey-${visit.id}`,
+            title: 'Journey to Site',
+            start: new Date(visit.journeyStartTime),
+            end: new Date(visit.journeyEndTime),
+            type: 'journey' as TaskType,
+            engineerId: visit.userId,
+            engineerName: user?.name || ''
+          });
+        }
+
+        // Add service time
+        if (visit.serviceStartTime && visit.serviceEndTime) {
+          allEvents.push({
+            id: `service-${visit.id}`,
+            title: `Service Visit - ${visit.jobId}`,
+            start: new Date(visit.serviceStartTime),
+            end: new Date(visit.serviceEndTime),
+            type: 'service' as TaskType,
+            engineerId: visit.userId,
+            engineerName: user?.name || ''
+          });
+        }
+      });
+    }
+
+    return allEvents;
+  }, [schedules, visits, user]);
 
   // Add new schedule entry
   const addScheduleMutation = useMutation({
@@ -98,7 +154,7 @@ export default function EngineerCalendarView() {
     setSelectedDates(null);
   };
 
-  if (isLoading || !user) {
+  if (isLoadingSchedules || isLoadingVisits || !user) {
     return (
       <div className="min-h-screen bg-background p-4 flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -113,7 +169,7 @@ export default function EngineerCalendarView() {
         <div className="grid grid-cols-1 gap-4">
           <ScheduleCalendar
             engineerId={user.id}
-            events={schedules || []}
+            events={events}
             onEventAdd={async (eventData) => {
               setSelectedDates(eventData);
               setIsDialogOpen(true);
@@ -143,7 +199,15 @@ export default function EngineerCalendarView() {
           >
             <div className="space-y-2">
               <Label htmlFor="title">Task Title</Label>
-              <Input id="title" {...form.register("title")} required />
+              <Input 
+                id="title" 
+                {...form.register("title")} 
+              />
+              {form.formState.errors.title && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.title.message}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -171,6 +235,11 @@ export default function EngineerCalendarView() {
                   ))}
                 </SelectContent>
               </Select>
+              {form.formState.errors.type && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.type.message}
+                </p>
+              )}
             </div>
 
             <Button
