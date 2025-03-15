@@ -11,6 +11,11 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@fullcalendar/core": "^6.1.15",
+    "@fullcalendar/daygrid": "^6.1.15",
+    "@fullcalendar/interaction": "^6.1.15",
+    "@fullcalendar/react": "^6.1.15",
+    "@fullcalendar/timegrid": "^6.1.15",
     "@hookform/resolvers": "^3.9.1",
     "@jest/globals": "^29.7.0",
     "@jest/types": "^29.6.3",
