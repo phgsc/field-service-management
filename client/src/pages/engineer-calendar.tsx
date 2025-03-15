@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -102,7 +103,7 @@ export default function EngineerCalendarView() {
           <form
             onSubmit={form.handleSubmit(async (data) => {
               if (!selectedDates) return;
-              
+
               await addScheduleMutation.mutateAsync({
                 title: data.title,
                 type: data.type,
@@ -114,17 +115,17 @@ export default function EngineerCalendarView() {
             className="space-y-4"
           >
             <div className="space-y-2">
-              <Label>Task Title</Label>
-              <Input {...form.register("title")} required />
+              <Label htmlFor="title">Task Title</Label>
+              <Input id="title" {...form.register("title")} required />
             </div>
-            
+
             <div className="space-y-2">
-              <Label>Task Type</Label>
+              <Label htmlFor="type">Task Type</Label>
               <Select
                 value={form.watch("type")}
                 onValueChange={(value: TaskType) => form.setValue("type", value)}
               >
-                <SelectTrigger>
+                <SelectTrigger id="type">
                   <SelectValue placeholder="Select task type" />
                 </SelectTrigger>
                 <SelectContent>

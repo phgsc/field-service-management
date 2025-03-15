@@ -1,8 +1,11 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { ScheduleCalendar, TASK_TYPES, TaskType } from "@/components/schedule-calendar";
+import { ScheduleCalendar } from "@/components/schedule-calendar";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AdminNav } from "@/components/admin-nav";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AdminCalendarView() {
   // Fetch all schedules
@@ -16,9 +19,11 @@ export default function AdminCalendarView() {
     mutationFn: async (scheduleData: {
       start: Date;
       end: Date;
-      type: TaskType;
-      allDay: boolean;
       engineerId: string;
+      engineerName: string;
+      title: string;
+      type: string;
+      allDay: boolean;
     }) => {
       const res = await apiRequest("POST", "/api/schedules", scheduleData);
       return res.json();
@@ -39,22 +44,22 @@ export default function AdminCalendarView() {
   return (
     <div className="min-h-screen bg-background p-4">
       <AdminNav />
-      <div className="space-y-4">
-        <h1 className="text-2xl font-bold">Engineer Schedules</h1>
-        <div className="grid grid-cols-1 gap-4">
-          <ScheduleCalendar
-            events={schedules || []}
-            onEventAdd={async (eventData) => {
-              // In a real implementation, you'd show a modal here to select the engineer
-              // and task type before creating the event
-              await addScheduleMutation.mutateAsync({
-                ...eventData,
-                engineerId: "some-engineer-id" // This would come from the modal
-              });
-            }}
-          />
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Engineer Schedules</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[600px]">
+            <ScheduleCalendar
+              events={schedules || []}
+              onEventAdd={async (eventData) => {
+                await addScheduleMutation.mutateAsync(eventData);
+              }}
+              isAdmin={true}
+            />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
