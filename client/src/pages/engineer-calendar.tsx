@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react";
 import { ScheduleCalendar, TASK_TYPES, TaskType } from "@/components/schedule-calendar";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -25,11 +26,11 @@ import { useForm } from "react-hook-form";
 interface NewTaskFormData {
   title: string;
   type: TaskType;
-  isMultiDay: boolean;
 }
 
 export default function EngineerCalendarView() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedDates, setSelectedDates] = useState<{
     start: Date;
@@ -40,8 +41,7 @@ export default function EngineerCalendarView() {
   const form = useForm<NewTaskFormData>({
     defaultValues: {
       title: "",
-      type: "admin",
-      isMultiDay: false
+      type: "admin"
     }
   });
 
@@ -61,15 +61,42 @@ export default function EngineerCalendarView() {
       type: TaskType;
       allDay: boolean;
     }) => {
-      const res = await apiRequest("POST", "/api/schedules", scheduleData);
+      const res = await apiRequest("POST", "/api/schedules", {
+        ...scheduleData,
+        engineerId: user?.id,
+        engineerName: user?.name
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Failed to create schedule');
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/schedules", user?.id] });
       setIsDialogOpen(false);
       form.reset();
+      setSelectedDates(null);
+      toast({
+        title: "Success",
+        description: "Task added to schedule",
+      });
     },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to add task",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   });
+
+  // Handle dialog close
+  const handleDialogClose = () => {
+    setIsDialogOpen(false);
+    form.reset();
+    setSelectedDates(null);
+  };
 
   if (isLoading || !user) {
     return (
@@ -95,7 +122,7 @@ export default function EngineerCalendarView() {
         </div>
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Task</DialogTitle>

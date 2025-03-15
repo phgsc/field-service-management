@@ -41,9 +41,10 @@ interface ScheduleCalendarProps {
     type: TaskType;
     allDay: boolean;
   }) => Promise<void>;
+  isAdmin?: boolean;
 }
 
-export function ScheduleCalendar({ engineerId, events, onEventAdd }: ScheduleCalendarProps) {
+export function ScheduleCalendar({ engineerId, events, onEventAdd, isAdmin }: ScheduleCalendarProps) {
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -51,7 +52,7 @@ export function ScheduleCalendar({ engineerId, events, onEventAdd }: ScheduleCal
   const calendarEvents = useMemo(() => {
     return events.map(event => ({
       id: event.id,
-      title: `${event.title} - ${event.engineerName}`,
+      title: isAdmin ? `${event.title} - ${event.engineerName}` : event.title,
       start: event.start,
       end: event.end,
       backgroundColor: TASK_TYPES[event.type].color,
@@ -61,7 +62,7 @@ export function ScheduleCalendar({ engineerId, events, onEventAdd }: ScheduleCal
         engineerId: event.engineerId
       }
     }));
-  }, [events]);
+  }, [events, isAdmin]);
 
   // Handle date selection for new events
   const handleDateSelect = useCallback(async (selectInfo: any) => {
@@ -85,6 +86,36 @@ export function ScheduleCalendar({ engineerId, events, onEventAdd }: ScheduleCal
 
   return (
     <Card className="p-4">
+      <style>
+        {`
+          .fc-toolbar-title {
+            color: hsl(var(--foreground)) !important;
+          }
+          .fc th {
+            color: hsl(var(--foreground)) !important;
+          }
+          .fc-timegrid-axis-cushion,
+          .fc-timegrid-slot-label-cushion {
+            color: hsl(var(--foreground)) !important;
+          }
+          .fc-day-today {
+            background-color: hsl(var(--accent)) !important;
+            opacity: 0.1;
+          }
+          .fc-button {
+            background-color: hsl(var(--primary)) !important;
+            border-color: hsl(var(--primary)) !important;
+          }
+          .fc-button:hover {
+            background-color: hsl(var(--primary)) !important;
+            opacity: 0.9;
+          }
+          .fc-button-active {
+            background-color: hsl(var(--accent)) !important;
+            border-color: hsl(var(--accent)) !important;
+          }
+        `}
+      </style>
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
