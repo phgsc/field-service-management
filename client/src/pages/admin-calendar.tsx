@@ -6,7 +6,8 @@ import { AdminNav } from "@/components/admin-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
+import * as XLSX from 'xlsx';
 import {
   Dialog,
   DialogContent,
@@ -36,7 +37,7 @@ export default function AdminCalendarView() {
     to: undefined,
   });
 
-  // Debug log to verify component mount and auth status
+  // Debug log to verify component mount
   console.log("AdminCalendarView mounted, user:", user);
 
   // Redirect non-admin users
@@ -99,51 +100,93 @@ export default function AdminCalendarView() {
         schedulesCount: schedules.length
       });
 
-      // Create sections for all engineers, even those without events
-      const engineerSections = engineers.map(engineer => {
+      // Create a new workbook
+      const workbook = XLSX.utils.book_new();
+
+      // Process each engineer
+      engineers.forEach(engineer => {
         // Filter events for this engineer within the date range
         const engineerEvents = schedules.filter(event => {
           const eventDate = new Date(event.start);
-          const isInDateRange = eventDate >= reportDateRange.from! && 
-                               eventDate <= reportDateRange.to!;
-          return event.engineerId === engineer.id && isInDateRange;
+          // Debug log for date filtering
+          console.log("Checking event:", {
+            eventId: event.id,
+            eventStart: eventDate,
+            dateRange: {
+              from: startOfDay(reportDateRange.from!),
+              to: endOfDay(reportDateRange.to!)
+            },
+            isInRange: eventDate >= startOfDay(reportDateRange.from!) &&
+                      eventDate <= endOfDay(reportDateRange.to!),
+            belongsToEngineer: event.engineerId === engineer.id
+          });
+          return event.engineerId === engineer.id &&
+                 eventDate >= startOfDay(reportDateRange.from!) &&
+                 eventDate <= endOfDay(reportDateRange.to!);
         });
 
-        // Create section even if no events
-        return [
-          `Engineer: ${engineer.profile?.name || engineer.username || 'Unknown Engineer'}`,
-          ["Date", "Time", "Title", "Type", "Duration (hours)"].join(","),
-          ...(engineerEvents.length > 0 
-            ? engineerEvents.map(event => {
-                const start = new Date(event.start);
-                const end = new Date(event.end);
-                const duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+        console.log("Engineer events filtered:", {
+          engineerId: engineer.id,
+          engineerName: engineer.profile?.name || engineer.username,
+          totalEvents: schedules.filter(e => e.engineerId === engineer.id).length,
+          filteredEvents: engineerEvents.length
+        });
 
-                return [
-                  format(start, "yyyy-MM-dd"),
-                  format(start, "HH:mm"),
-                  event.title,
-                  event.type,
-                  duration.toFixed(2),
-                ].join(",");
-              })
-            : ["No events in selected date range"]
-          ),
-          "" // Empty line between engineers
-        ].join("\n");
+        // Create data for this engineer's sheet
+        const sheetData = [
+          ["Engineer Schedule Report"],
+          [`Name: ${engineer.profile?.name || engineer.username || 'Unknown Engineer'}`],
+          [`Date Range: ${format(reportDateRange.from!, "PPP")} to ${format(reportDateRange.to!, "PPP")}`],
+          [], // Empty row
+          ["Date", "Time", "Title", "Type", "Duration (hours)"]
+        ];
+
+        if (engineerEvents.length > 0) {
+          engineerEvents.forEach(event => {
+            const start = new Date(event.start);
+            const end = new Date(event.end);
+            const duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+
+            sheetData.push([
+              format(start, "yyyy-MM-dd"),
+              format(start, "HH:mm"),
+              event.title,
+              event.type,
+              Number(duration.toFixed(2))
+            ]);
+          });
+        } else {
+          sheetData.push(["No events in selected date range"]);
+        }
+
+        // Create worksheet and add to workbook
+        const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+
+        // Set column widths
+        const colWidths = [{ wch: 12 }, { wch: 8 }, { wch: 30 }, { wch: 15 }, { wch: 15 }];
+        worksheet['!cols'] = colWidths;
+
+        // Add the worksheet to the workbook
+        const sheetName = (engineer.profile?.name || engineer.username || 'Unknown')
+          .slice(0, 30) // Excel sheet names limited to 31 chars
+          .replace(/[\[\]\*\/\\\?\:]/g, ''); // Remove invalid chars
+
+        console.log("Adding sheet for engineer:", {
+          engineerId: engineer.id,
+          sheetName,
+          rowCount: sheetData.length
+        });
+
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
       });
 
-      const csvContent = engineerSections.join("\n");
-
-      // Create and download the file
-      const blob = new Blob([csvContent], { type: "text/csv" });
+      // Generate Excel file
+      const excelBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `all-engineers-calendar-report-${format(
-        reportDateRange.from,
-        "yyyy-MM-dd"
-      )}-to-${format(reportDateRange.to, "yyyy-MM-dd")}.csv`;
+      a.download = `engineer-schedules-${format(reportDateRange.from, "yyyy-MM-dd")}-to-${format(reportDateRange.to, "yyyy-MM-dd")}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -152,7 +195,7 @@ export default function AdminCalendarView() {
       setIsReportDialogOpen(false);
       toast({
         title: "Report downloaded",
-        description: "Your calendar report has been downloaded successfully",
+        description: "Your Excel report has been downloaded successfully",
       });
     } catch (error) {
       console.error("Report generation error:", error);

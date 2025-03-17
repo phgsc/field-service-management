@@ -38,33 +38,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Function to check if port is in use
-function isPortAvailable(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const tester = createServer()
-      .once('error', () => {
-        resolve(false);
-      })
-      .once('listening', () => {
-        tester.once('close', () => {
-          resolve(true);
-        }).close();
-      })
-      .listen(port, '0.0.0.0');
-  });
-}
-
 (async () => {
   try {
     log("Starting server initialization...");
-    const port = 5000;
-
-    // Check port availability
-    const isAvailable = await isPortAvailable(port);
-    if (!isAvailable) {
-      log(`Port ${port} is already in use. Please ensure no other instance is running.`);
-      process.exit(1);
-    }
 
     const server = await registerRoutes(app);
 
@@ -103,20 +79,15 @@ function isPortAvailable(port: number): Promise<boolean> {
     process.on('SIGTERM', gracefulShutdown);
     process.on('SIGINT', gracefulShutdown);
 
-    server.listen({
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    }, () => {
-      log(`Server started successfully on port ${port}`);
+    server.listen(5000, "0.0.0.0", () => {
+      log(`Server started successfully on port 5000`);
     }).on('error', (error: any) => {
       if (error.code === 'EADDRINUSE') {
-        log(`Port ${port} is already in use. Please ensure no other instance is running.`);
-        process.exit(1);
-      } else {
-        log(`Failed to start server: ${error.message}`);
+        log("Port 5000 is already in use. Please ensure no other instance is running.");
         process.exit(1);
       }
+      log(`Failed to start server: ${error.message}`);
+      process.exit(1);
     });
 
   } catch (error) {
