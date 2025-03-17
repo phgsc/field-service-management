@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, Download } from "lucide-react";
 import { ScheduleCalendar, TASK_TYPES, TaskType } from "@/components/schedule-calendar";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -20,6 +20,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -40,11 +44,19 @@ export default function EngineerCalendarView() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [selectedDates, setSelectedDates] = useState<{
     start: Date;
     end: Date;
     allDay: boolean;
   } | null>(null);
+  const [reportDateRange, setReportDateRange] = useState<{
+    from: Date | undefined;
+    to: Date | undefined;
+  }>({
+    from: undefined,
+    to: undefined
+  });
 
   const form = useForm<TaskFormData>({
     resolver: zodResolver(taskSchema),
@@ -155,6 +167,111 @@ export default function EngineerCalendarView() {
     }
   });
 
+  // Add updateScheduleMutation after addScheduleMutation
+  const updateScheduleMutation = useMutation({
+    mutationFn: async (scheduleData: {
+      id: string;
+      title?: string;
+      type?: TaskType;
+      start?: Date;
+      end?: Date;
+    }) => {
+      const payload = {
+        ...scheduleData,
+        // Convert dates to ISO strings if they exist
+        ...(scheduleData.start && { start: scheduleData.start.toISOString() }),
+        ...(scheduleData.end && { end: scheduleData.end.toISOString() })
+      };
+      console.log("Sending schedule update payload:", payload);
+
+      const res = await apiRequest("PATCH", `/api/schedules/${scheduleData.id}`, payload);
+      if (!res.ok) {
+        const error = await res.json();
+        console.error("API error response:", error);
+        throw new Error(error.message || 'Failed to update schedule');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules", user?.id] });
+      toast({
+        title: "Success",
+        description: "Task updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      console.error("Schedule update error:", error);
+      toast({
+        title: "Failed to update task",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Function to download calendar report
+  const downloadReport = async () => {
+    if (!reportDateRange.from || !reportDateRange.to) {
+      toast({
+        title: "Date range required",
+        description: "Please select both start and end dates for the report",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Filter events within the selected date range
+      const filteredEvents = events.filter(event => {
+        const eventDate = new Date(event.start);
+        return eventDate >= reportDateRange.from! && 
+               eventDate <= reportDateRange.to!;
+      });
+
+      // Create CSV content
+      const csvContent = [
+        ['Date', 'Time', 'Title', 'Type', 'Duration (hours)'].join(','),
+        ...filteredEvents.map(event => {
+          const start = new Date(event.start);
+          const end = new Date(event.end);
+          const duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+
+          return [
+            format(start, 'yyyy-MM-dd'),
+            format(start, 'HH:mm'),
+            event.title,
+            event.type,
+            duration.toFixed(2)
+          ].join(',');
+        })
+      ].join('\n');
+
+      // Create and download the file
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `calendar-report-${format(reportDateRange.from, 'yyyy-MM-dd')}-to-${format(reportDateRange.to, 'yyyy-MM-dd')}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setIsReportDialogOpen(false);
+      toast({
+        title: "Report downloaded",
+        description: "Your calendar report has been downloaded successfully"
+      });
+    } catch (error) {
+      console.error("Report generation error:", error);
+      toast({
+        title: "Failed to generate report",
+        description: "An error occurred while generating the report",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Handle dialog close
   const handleDialogClose = () => {
     setIsDialogOpen(false);
@@ -173,7 +290,17 @@ export default function EngineerCalendarView() {
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold">My Schedule</h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">My Schedule</h1>
+          <Button
+            onClick={() => setIsReportDialogOpen(true)}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Download Report
+          </Button>
+        </div>
         <div className="grid grid-cols-1 gap-4">
           <ScheduleCalendar
             engineerId={user.id}
@@ -181,6 +308,9 @@ export default function EngineerCalendarView() {
             onEventAdd={async (eventData) => {
               setSelectedDates(eventData);
               setIsDialogOpen(true);
+            }}
+            onEventUpdate={async (eventData) => {
+              await updateScheduleMutation.mutateAsync(eventData);
             }}
           />
         </div>
@@ -261,6 +391,82 @@ export default function EngineerCalendarView() {
               Add Task
             </Button>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Download Calendar Report</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Date Range</Label>
+              <div className="flex gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        !reportDateRange.from && "text-muted-foreground"
+                      )}
+                    >
+                      {reportDateRange.from ? (
+                        format(reportDateRange.from, "PPP")
+                      ) : (
+                        <span>Pick a start date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={reportDateRange.from}
+                      onSelect={(date) =>
+                        setReportDateRange(prev => ({ ...prev, from: date }))
+                      }
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        !reportDateRange.to && "text-muted-foreground"
+                      )}
+                    >
+                      {reportDateRange.to ? (
+                        format(reportDateRange.to, "PPP")
+                      ) : (
+                        <span>Pick an end date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={reportDateRange.to}
+                      onSelect={(date) =>
+                        setReportDateRange(prev => ({ ...prev, to: date }))
+                      }
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+            <Button
+              className="w-full"
+              onClick={downloadReport}
+              disabled={!reportDateRange.from || !reportDateRange.to}
+            >
+              Download Report
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

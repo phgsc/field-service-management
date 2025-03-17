@@ -72,6 +72,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add update schedule endpoint after existing schedule routes
+  app.patch("/api/schedules/:id", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    try {
+      const schedule = await Schedule.findById(req.params.id);
+      if (!schedule) {
+        return res.status(404).json({ message: "Schedule not found" });
+      }
+
+      // Only allow users to edit their own schedules unless they're admin
+      if (!req.user.isAdmin && schedule.engineerId.toString() !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to edit this schedule" });
+      }
+
+      const updateData = {
+        ...req.body,
+        // Convert dates if they're provided
+        ...(req.body.start && { start: new Date(req.body.start).toISOString() }),
+        ...(req.body.end && { end: new Date(req.body.end).toISOString() })
+      };
+
+      // Validate the update data
+      try {
+        if (updateData.start || updateData.end) {
+          const validatedData = insertScheduleSchema.parse({
+            ...schedule.toObject(),
+            ...updateData
+          });
+          console.log("Validated update data:", validatedData);
+        }
+      } catch (validationError) {
+        console.error("Schedule update validation error:", validationError);
+        return res.status(400).json({
+          message: "Validation error",
+          details: validationError.errors
+        });
+      }
+
+      const updatedSchedule = await Schedule.findByIdAndUpdate(
+        req.params.id,
+        updateData,
+        { new: true }
+      );
+
+      res.json(updatedSchedule);
+    } catch (err) {
+      console.error("Schedule update error:", err);
+      res.status(500).send((err as Error).message);
+    }
+  });
+
 
   // Add new route for creating engineer accounts (admin only)
   app.post("/api/engineers", requireAdmin, async (req, res) => {
