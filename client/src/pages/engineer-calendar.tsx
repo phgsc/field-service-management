@@ -167,7 +167,7 @@ export default function EngineerCalendarView() {
     }
   });
 
-  // Add updateScheduleMutation after addScheduleMutation
+  // Update the mutation function to ensure we're sending the correct ID
   const updateScheduleMutation = useMutation({
     mutationFn: async (scheduleData: {
       id: string;
@@ -176,6 +176,11 @@ export default function EngineerCalendarView() {
       start?: Date;
       end?: Date;
     }) => {
+      // Ensure the ID is valid before sending
+      if (!scheduleData.id) {
+        throw new Error('Schedule ID is required for updates');
+      }
+
       const payload = {
         ...scheduleData,
         // Convert dates to ISO strings if they exist
@@ -224,7 +229,7 @@ export default function EngineerCalendarView() {
       // Filter events within the selected date range
       const filteredEvents = events.filter(event => {
         const eventDate = new Date(event.start);
-        return eventDate >= reportDateRange.from! && 
+        return eventDate >= reportDateRange.from! &&
                eventDate <= reportDateRange.to!;
       });
 

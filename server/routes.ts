@@ -9,7 +9,8 @@ import {
   ServiceStatus,
 } from "@shared/schema";
 import { Schedule } from "./db"; // Added import statement
-import {insertScheduleSchema} from "@shared/schema" // Added import for schedule schema
+import {insertScheduleSchema} from "@shared/schema"; // Added import for schedule schema
+import mongoose from 'mongoose'; // Added for ObjectId
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
@@ -76,6 +77,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/schedules/:id", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     try {
+      // Validate ObjectId format
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ message: "Invalid schedule ID format" });
+      }
+
       const schedule = await Schedule.findById(req.params.id);
       if (!schedule) {
         return res.status(404).json({ message: "Schedule not found" });
@@ -122,7 +128,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).send((err as Error).message);
     }
   });
-
 
   // Add new route for creating engineer accounts (admin only)
   app.post("/api/engineers", requireAdmin, async (req, res) => {
