@@ -82,7 +82,6 @@ export default function EngineerCalendarView() {
     },
   });
 
-  // Fetch engineer's schedules and visits
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery({
     queryKey: ["/api/schedules", user?.id],
     enabled: !!user?.id,
@@ -96,20 +95,16 @@ export default function EngineerCalendarView() {
     enabled: !!user?.id,
   });
 
-  // Combine schedules and visits into events
   const events = useMemo(() => {
     const allEvents = [];
 
-    // Add regular schedules
     if (schedules && Array.isArray(schedules)) {
       console.log("Processing schedules:", schedules);
       allEvents.push(...schedules);
     }
 
-    // Add visits as events
     if (visits && Array.isArray(visits)) {
       visits.forEach((visit) => {
-        // Add journey time
         if (visit.journeyStartTime && visit.journeyEndTime) {
           allEvents.push({
             id: `journey-${visit.id}`,
@@ -122,7 +117,6 @@ export default function EngineerCalendarView() {
           });
         }
 
-        // Add service time
         if (visit.serviceStartTime && visit.serviceEndTime) {
           allEvents.push({
             id: `service-${visit.id}`,
@@ -140,7 +134,6 @@ export default function EngineerCalendarView() {
     return allEvents;
   }, [schedules, visits, user]);
 
-  // Update the mutation function to handle admin updates properly
   const updateScheduleMutation = useMutation({
     mutationFn: async (scheduleData: {
       id: string;
@@ -189,11 +182,9 @@ export default function EngineerCalendarView() {
       return updatedSchedule;
     },
     onSuccess: () => {
-      // For admin, invalidate all schedules
       if (user?.isAdmin) {
         queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
       } else {
-        // For engineers, only invalidate their own schedules
         queryClient.invalidateQueries({ queryKey: ["/api/schedules", user?.id] });
       }
 
@@ -212,7 +203,6 @@ export default function EngineerCalendarView() {
     }
   });
 
-  // Update the mutation function to match the schema
   const addScheduleMutation = useMutation({
     mutationFn: async (scheduleData: {
       title: string;
@@ -225,7 +215,6 @@ export default function EngineerCalendarView() {
         ...scheduleData,
         engineerId: user?.id,
         engineerName: user?.profile?.name || user?.username || "Unknown",
-        // Ensure dates are in ISO format
         start: scheduleData.start.toISOString(),
         end: scheduleData.end.toISOString(),
       };
@@ -259,8 +248,8 @@ export default function EngineerCalendarView() {
     },
   });
 
-  // Function to download calendar report
   const downloadReport = async () => {
+    console.log("Starting report download, user is admin:", user?.isAdmin);
     if (!reportDateRange.from || !reportDateRange.to) {
       toast({
         title: "Date range required",
@@ -271,10 +260,9 @@ export default function EngineerCalendarView() {
     }
 
     try {
-      // For admins, fetch all engineers' schedules
       let eventsToProcess = events;
       if (user?.isAdmin) {
-        // Group events by engineer
+        console.log("Generating admin report with events:", events);
         const eventsByEngineer = events.reduce((acc: any, event) => {
           if (!acc[event.engineerId]) {
             acc[event.engineerId] = [];
@@ -283,7 +271,6 @@ export default function EngineerCalendarView() {
           return acc;
         }, {});
 
-        // Create CSV content with separate sections for each engineer
         const csvContent = Object.entries(eventsByEngineer).map(([engineerId, engineerEvents]: [string, any[]]) => {
           const engineerName = engineerEvents[0]?.engineerName || 'Unknown Engineer';
 
@@ -311,11 +298,10 @@ export default function EngineerCalendarView() {
                 duration.toFixed(2),
               ].join(",");
             }),
-            "", // Empty line between engineers
+            "",
           ].join("\n");
         }).join("\n");
 
-        // Create and download the file
         const blob = new Blob([csvContent], { type: "text/csv" });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -329,7 +315,7 @@ export default function EngineerCalendarView() {
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
       } else {
-        // Regular engineer report generation (existing code)
+        console.log("Generating engineer report with events:", events);
         const filteredEvents = events.filter((event) => {
           const eventDate = new Date(event.start);
           return (
@@ -384,7 +370,6 @@ export default function EngineerCalendarView() {
     }
   };
 
-  // Handle dialog close
   const handleDialogClose = () => {
     setIsDialogOpen(false);
     form.reset();
