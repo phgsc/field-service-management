@@ -11,6 +11,8 @@ import {
 import { Schedule } from "./db"; // Added import statement
 import {insertScheduleSchema} from "@shared/schema"; // Added import for schedule schema
 import mongoose from 'mongoose'; // Added for ObjectId
+import * as z from 'zod';
+
 
 // Add this helper function at the top of the file
 function transformSchedule(schedule: any) {
@@ -108,19 +110,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         // Convert dates if they're provided
         ...(req.body.start && { start: new Date(req.body.start).toISOString() }),
-        ...(req.body.end && { end: new Date(req.body.end).toISOString() })
+        ...(req.body.end && { end: new Date(req.body.end).toISOString() }),
       };
 
       console.log("Processed update data:", updateData);
 
-      // Validate the update data
+      // Validate only the provided fields
       try {
         if (updateData.start || updateData.end) {
-          const validatedData = insertScheduleSchema.parse({
-            ...schedule.toObject(),
-            ...updateData
+          // Only validate the date fields if they're being updated
+          const dateSchema = z.object({
+            start: z.string().datetime().optional(),
+            end: z.string().datetime().optional(),
           });
-          console.log("Validated update data:", validatedData);
+          dateSchema.parse(updateData);
+        }
+
+        if (updateData.title) {
+          const titleSchema = z.object({
+            title: z.string().min(1, "Title is required"),
+          });
+          titleSchema.parse(updateData);
+        }
+
+        if (updateData.type) {
+          const typeSchema = z.object({
+            type: z.enum([
+              'journey', 'service', 'admin', 'sales-call', 'sales-visit',
+              'research', 'day-off', 'vacation', 'public-holiday',
+              'weekly-off', 'in-office'
+            ])
+          });
+          typeSchema.parse(updateData);
         }
       } catch (validationError: any) {
         console.error("Schedule update validation error:", validationError);
