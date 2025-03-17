@@ -12,6 +12,15 @@ import { Schedule } from "./db"; // Added import statement
 import {insertScheduleSchema} from "@shared/schema"; // Added import for schedule schema
 import mongoose from 'mongoose'; // Added for ObjectId
 
+// Add this helper function at the top of the file
+function transformSchedule(schedule: any) {
+  if (!schedule) return null;
+  const scheduleObj = schedule.toObject();
+  scheduleObj.id = scheduleObj._id.toString();
+  delete scheduleObj._id;
+  return scheduleObj;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
@@ -44,7 +53,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const validatedData = insertScheduleSchema.parse(scheduleData);
         console.log("Validated schedule data:", validatedData);
-      } catch (validationError) {
+      } catch (validationError: any) {
         console.error("Schema validation error:", validationError);
         return res.status(400).json({ 
           message: "Validation error", 
@@ -53,7 +62,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const schedule = await Schedule.create(scheduleData);
-      res.status(201).json(schedule);
+      res.status(201).json(transformSchedule(schedule));
     } catch (err) {
       console.error("Schedule creation error:", err);
       res.status(500).send((err as Error).message);
@@ -66,7 +75,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const query = req.user.isAdmin ? {} : { engineerId: req.user.id };
       console.log("Schedule query:", query);
       const schedules = await Schedule.find(query).sort({ start: 1 });
-      res.json(schedules);
+      res.json(schedules.map(transformSchedule));
     } catch (err) {
       console.error("Schedule fetch error:", err);
       res.status(500).send((err as Error).message);
@@ -77,6 +86,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/schedules/:id", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     try {
+      console.log("Update request - ID:", req.params.id);
+      console.log("Update request body:", req.body);
+
       // Validate ObjectId format
       if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
         return res.status(400).json({ message: "Invalid schedule ID format" });
@@ -99,6 +111,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...(req.body.end && { end: new Date(req.body.end).toISOString() })
       };
 
+      console.log("Processed update data:", updateData);
+
       // Validate the update data
       try {
         if (updateData.start || updateData.end) {
@@ -108,7 +122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           console.log("Validated update data:", validatedData);
         }
-      } catch (validationError) {
+      } catch (validationError: any) {
         console.error("Schedule update validation error:", validationError);
         return res.status(400).json({
           message: "Validation error",
@@ -122,7 +136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { new: true }
       );
 
-      res.json(updatedSchedule);
+      res.json(transformSchedule(updatedSchedule));
     } catch (err) {
       console.error("Schedule update error:", err);
       res.status(500).send((err as Error).message);

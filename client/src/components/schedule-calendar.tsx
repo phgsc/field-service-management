@@ -136,8 +136,26 @@ export function ScheduleCalendar({ engineerId, events, onEventAdd, onEventUpdate
     if (!onEventUpdate) return;
 
     try {
+      // Extract the correct ID from the event
+      const eventId = changeInfo.event.id;
+      if (!eventId) {
+        throw new Error("Event ID is missing");
+      }
+
+      // Skip updates for visit-related events
+      if (eventId.startsWith('journey-') || eventId.startsWith('service-')) {
+        toast({
+          title: "Cannot update visit",
+          description: "Visit-related events cannot be modified",
+          variant: "destructive"
+        });
+        changeInfo.revert();
+        return;
+      }
+
+      console.log("Updating event with ID:", eventId);
       await onEventUpdate({
-        id: changeInfo.event.id,
+        id: eventId,
         start: changeInfo.event.start,
         end: changeInfo.event.end
       });
@@ -153,18 +171,45 @@ export function ScheduleCalendar({ engineerId, events, onEventAdd, onEventUpdate
 
   // Handle event click for editing
   const handleEventClick = useCallback((clickInfo: any) => {
-    setSelectedEvent(clickInfo.event);
+    // Skip edit for visit-related events
+    if (clickInfo.event.id.startsWith('journey-') || clickInfo.event.id.startsWith('service-')) {
+      toast({
+        title: "Cannot edit visit",
+        description: "Visit-related events cannot be modified",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Ensure we have a valid event ID before opening edit dialog
+    if (!clickInfo.event.id) {
+      toast({
+        title: "Error",
+        description: "Cannot edit this event - missing ID",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log("Opening edit dialog for event:", clickInfo.event.id);
+    setSelectedEvent({
+      id: clickInfo.event.id,
+      title: clickInfo.event.title,
+      type: clickInfo.event.extendedProps.type
+    });
+
     form.reset({
       title: clickInfo.event.title,
       type: clickInfo.event.extendedProps.type
     });
     setIsEditDialogOpen(true);
-  }, [form]);
+  }, [form, toast]);
 
   const handleEditSubmit = async (data: TaskFormData) => {
     if (!selectedEvent || !onEventUpdate) return;
 
     try {
+      console.log("Submitting edit for event:", selectedEvent.id);
       await onEventUpdate({
         id: selectedEvent.id,
         title: data.title,
