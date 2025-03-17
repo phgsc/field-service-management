@@ -28,8 +28,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 const taskSchema = z.object({
   title: z.string().min(1, "Title is required"),
   type: z.enum([
-    'journey', 'service', 'admin', 'sales-call', 'sales-visit', 
-    'research', 'day-off', 'vacation', 'public-holiday', 
+    'journey', 'service', 'admin', 'sales-call', 'sales-visit',
+    'research', 'day-off', 'vacation', 'public-holiday',
     'weekly-off', 'in-office'
   ] as const)
 });
@@ -108,7 +108,7 @@ export default function EngineerCalendarView() {
     return allEvents;
   }, [schedules, visits, user]);
 
-  // Add new schedule entry
+  // Update the mutation function to match the schema
   const addScheduleMutation = useMutation({
     mutationFn: async (scheduleData: {
       title: string;
@@ -117,13 +117,20 @@ export default function EngineerCalendarView() {
       type: TaskType;
       allDay: boolean;
     }) => {
-      const res = await apiRequest("POST", "/api/schedules", {
+      const payload = {
         ...scheduleData,
         engineerId: user?.id,
-        engineerName: user?.name
-      });
+        engineerName: user?.profile?.name || user?.username || 'Unknown',
+        // Ensure dates are in ISO format
+        start: scheduleData.start.toISOString(),
+        end: scheduleData.end.toISOString()
+      };
+      console.log("Sending schedule creation payload:", payload);
+
+      const res = await apiRequest("POST", "/api/schedules", payload);
       if (!res.ok) {
         const error = await res.json();
+        console.error("API error response:", error);
         throw new Error(error.message || 'Failed to create schedule');
       }
       return res.json();
@@ -139,6 +146,7 @@ export default function EngineerCalendarView() {
       });
     },
     onError: (error: Error) => {
+      console.error("Schedule creation error:", error);
       toast({
         title: "Failed to add task",
         description: error.message,
@@ -199,9 +207,9 @@ export default function EngineerCalendarView() {
           >
             <div className="space-y-2">
               <Label htmlFor="title">Task Title</Label>
-              <Input 
-                id="title" 
-                {...form.register("title")} 
+              <Input
+                id="title"
+                {...form.register("title")}
               />
               {form.formState.errors.title && (
                 <p className="text-sm text-destructive">

@@ -67,6 +67,28 @@ const visitSchema = new mongoose.Schema({
   totalJourneyTime: { type: Number }  // in minutes
 });
 
+// Add after the existing schemas
+const scheduleSchema = new mongoose.Schema({
+  engineerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  engineerName: { type: String, required: true },
+  title: { type: String, required: true },
+  type: { 
+    type: String, 
+    required: true,
+    enum: [
+      'journey', 'service', 'admin', 'sales-call', 'sales-visit',
+      'research', 'day-off', 'vacation', 'public-holiday',
+      'weekly-off', 'in-office'
+    ]
+  },
+  start: { type: Date, required: true },
+  end: { type: Date, required: true },
+  allDay: { type: Boolean, default: false }
+});
+
 export const User = mongoose.model('User', userSchema);
 export const Location = mongoose.model('Location', locationSchema);
 export const Visit = mongoose.model('Visit', visitSchema);
+
+// Add after the existing exports
+export const Schedule = mongoose.model('Schedule', scheduleSchema);

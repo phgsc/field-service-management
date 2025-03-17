@@ -8,6 +8,8 @@ import {
   resetPasswordSchema,
   ServiceStatus,
 } from "@shared/schema";
+import { Schedule } from "./db"; // Added import statement
+import {insertScheduleSchema} from "@shared/schema" // Added import for schedule schema
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
@@ -19,6 +21,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     next();
   };
+
+  // Schedule management routes
+  app.post("/api/schedules", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    try {
+      console.log("Schedule creation request body:", req.body);
+
+      // Validate the incoming data using the schema
+      const scheduleData = {
+        ...req.body,
+        engineerId: req.user.id,
+        // Ensure dates are properly formatted
+        start: new Date(req.body.start).toISOString(),
+        end: new Date(req.body.end).toISOString()
+      };
+
+      console.log("Processed schedule data:", scheduleData);
+
+      // Validate against schema
+      try {
+        const validatedData = insertScheduleSchema.parse(scheduleData);
+        console.log("Validated schedule data:", validatedData);
+      } catch (validationError) {
+        console.error("Schema validation error:", validationError);
+        return res.status(400).json({ 
+          message: "Validation error", 
+          details: validationError.errors 
+        });
+      }
+
+      const schedule = await Schedule.create(scheduleData);
+      res.status(201).json(schedule);
+    } catch (err) {
+      console.error("Schedule creation error:", err);
+      res.status(500).send((err as Error).message);
+    }
+  });
+
+  app.get("/api/schedules", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    try {
+      const query = req.user.isAdmin ? {} : { engineerId: req.user.id };
+      console.log("Schedule query:", query);
+      const schedules = await Schedule.find(query).sort({ start: 1 });
+      res.json(schedules);
+    } catch (err) {
+      console.error("Schedule fetch error:", err);
+      res.status(500).send((err as Error).message);
+    }
+  });
+
 
   // Add new route for creating engineer accounts (admin only)
   app.post("/api/engineers", requireAdmin, async (req, res) => {

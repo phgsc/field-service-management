@@ -110,3 +110,30 @@ export interface Visit {
   totalServiceTime?: number;
   totalJourneyTime?: number;
 }
+
+export const insertScheduleSchema = z.object({
+  engineerId: z.string(),
+  engineerName: z.string(),
+  title: z.string().min(1, "Title is required"),
+  type: z.enum([
+    'journey', 'service', 'admin', 'sales-call', 'sales-visit', 
+    'research', 'day-off', 'vacation', 'public-holiday', 
+    'weekly-off', 'in-office'
+  ]),
+  start: z.string().or(z.date()),
+  end: z.string().or(z.date()),
+  allDay: z.boolean().default(false)
+});
+
+export interface Schedule {
+  id: string;
+  engineerId: string;
+  engineerName: string;
+  title: string;
+  type: string;
+  start: Date;
+  end: Date;
+  allDay: boolean;
+}
+
+export type InsertSchedule = z.infer<typeof insertScheduleSchema>;
