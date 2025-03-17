@@ -84,7 +84,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add update schedule endpoint after existing schedule routes
+  // Update the PATCH endpoint to allow admin updates
   app.patch("/api/schedules/:id", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     try {
@@ -101,7 +101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Schedule not found" });
       }
 
-      // Only allow users to edit their own schedules unless they're admin
+      // Allow admins to update any schedule, engineers only their own
       if (!req.user.isAdmin && schedule.engineerId.toString() !== req.user.id) {
         return res.status(403).json({ message: "Not authorized to edit this schedule" });
       }
@@ -110,7 +110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         // Convert dates if they're provided
         ...(req.body.start && { start: new Date(req.body.start).toISOString() }),
-        ...(req.body.end && { end: new Date(req.body.end).toISOString() }),
+        ...(req.body.end && { end: new Date(req.body.end).toISOString() })
       };
 
       console.log("Processed update data:", updateData);
@@ -118,7 +118,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate only the provided fields
       try {
         if (updateData.start || updateData.end) {
-          // Only validate the date fields if they're being updated
           const dateSchema = z.object({
             start: z.string().datetime().optional(),
             end: z.string().datetime().optional(),

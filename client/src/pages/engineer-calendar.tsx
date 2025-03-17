@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Loader2, Download } from "lucide-react";
+import { Loader2, Download, LogOut } from "lucide-react";
 import {
   ScheduleCalendar,
   TASK_TYPES,
@@ -57,7 +57,7 @@ const taskSchema = z.object({
 type TaskFormData = z.infer<typeof taskSchema>;
 
 export default function EngineerCalendarView() {
-  const { user } = useAuth();
+  const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
@@ -140,6 +140,78 @@ export default function EngineerCalendarView() {
     return allEvents;
   }, [schedules, visits, user]);
 
+  // Update the mutation function to handle admin updates properly
+  const updateScheduleMutation = useMutation({
+    mutationFn: async (scheduleData: {
+      id: string;
+      title?: string;
+      type?: TaskType;
+      start?: Date;
+      end?: Date;
+    }) => {
+      if (!scheduleData.id) {
+        throw new Error("Schedule ID is required for updates");
+      }
+
+      if (scheduleData.id.startsWith('journey-') || scheduleData.id.startsWith('service-')) {
+        throw new Error("Cannot update visit-related events");
+      }
+
+      console.log("Updating schedule with ID:", scheduleData.id);
+      console.log("Update payload:", scheduleData);
+
+      const payload = {
+        ...scheduleData,
+        ...(scheduleData.start && { start: scheduleData.start.toISOString() }),
+        ...(scheduleData.end && { end: scheduleData.end.toISOString() })
+      };
+
+      console.log("Sending schedule update request:", {
+        id: scheduleData.id,
+        payload,
+        isAdmin: user?.isAdmin
+      });
+
+      const res = await apiRequest(
+        "PATCH",
+        `/api/schedules/${scheduleData.id}`,
+        payload
+      );
+
+      if (!res.ok) {
+        const error = await res.json();
+        console.error("Schedule update error response:", error);
+        throw new Error(error.message || "Failed to update schedule");
+      }
+
+      const updatedSchedule = await res.json();
+      console.log("Schedule update success:", updatedSchedule);
+      return updatedSchedule;
+    },
+    onSuccess: () => {
+      // For admin, invalidate all schedules
+      if (user?.isAdmin) {
+        queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
+      } else {
+        // For engineers, only invalidate their own schedules
+        queryClient.invalidateQueries({ queryKey: ["/api/schedules", user?.id] });
+      }
+
+      toast({
+        title: "Success",
+        description: "Task updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      console.error("Schedule update error:", error);
+      toast({
+        title: "Failed to update task",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
   // Update the mutation function to match the schema
   const addScheduleMutation = useMutation({
     mutationFn: async (scheduleData: {
@@ -187,65 +259,6 @@ export default function EngineerCalendarView() {
     },
   });
 
-  // Update the mutation function to ensure we're sending the correct ID
-  const updateScheduleMutation = useMutation({
-    mutationFn: async (scheduleData: {
-      id: string;
-      title?: string;
-      type?: TaskType;
-      start?: Date;
-      end?: Date;
-    }) => {
-      // Ensure the ID is valid before sending
-      if (!scheduleData.id) {
-        throw new Error("Schedule ID is required for updates");
-      }
-
-      // Skip updates for visit-related events
-      if (scheduleData.id.startsWith('journey-') || scheduleData.id.startsWith('service-')) {
-        throw new Error("Cannot update visit-related events");
-      }
-
-      console.log("Updating schedule with ID:", scheduleData.id);
-      console.log("Update payload:", scheduleData);
-
-      const payload = {
-        ...scheduleData,
-        // Convert dates to ISO strings if they exist
-        ...(scheduleData.start && { start: scheduleData.start.toISOString() }),
-        ...(scheduleData.end && { end: scheduleData.end.toISOString() })
-      };
-
-      const res = await apiRequest(
-        "PATCH",
-        `/api/schedules/${scheduleData.id}`,
-        payload
-      );
-
-      if (!res.ok) {
-        const error = await res.json();
-        console.error("Schedule update error response:", error);
-        throw new Error(error.message || "Failed to update schedule");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/schedules", user?.id] });
-      toast({
-        title: "Success",
-        description: "Task updated successfully",
-      });
-    },
-    onError: (error: Error) => {
-      console.error("Schedule update error:", error);
-      toast({
-        title: "Failed to update task",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  });
-
   // Function to download calendar report
   const downloadReport = async () => {
     if (!reportDateRange.from || !reportDateRange.to) {
@@ -258,42 +271,103 @@ export default function EngineerCalendarView() {
     }
 
     try {
-      // Filter events within the selected date range
-      const filteredEvents = events.filter((event) => {
-        const eventDate = new Date(event.start);
-        return (
-          eventDate >= reportDateRange.from! && eventDate <= reportDateRange.to!
-        );
-      });
+      // For admins, fetch all engineers' schedules
+      let eventsToProcess = events;
+      if (user?.isAdmin) {
+        // Group events by engineer
+        const eventsByEngineer = events.reduce((acc: any, event) => {
+          if (!acc[event.engineerId]) {
+            acc[event.engineerId] = [];
+          }
+          acc[event.engineerId].push(event);
+          return acc;
+        }, {});
 
-      // Create CSV content
-      const csvContent = [
-        ["Date", "Time", "Title", "Type", "Duration (hours)"].join(","),
-        ...filteredEvents.map((event) => {
-          const start = new Date(event.start);
-          const end = new Date(event.end);
-          const duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+        // Create CSV content with separate sections for each engineer
+        const csvContent = Object.entries(eventsByEngineer).map(([engineerId, engineerEvents]: [string, any[]]) => {
+          const engineerName = engineerEvents[0]?.engineerName || 'Unknown Engineer';
+
+          const filteredEvents = engineerEvents.filter((event) => {
+            const eventDate = new Date(event.start);
+            return (
+              eventDate >= reportDateRange.from! &&
+              eventDate <= reportDateRange.to!
+            );
+          });
 
           return [
-            format(start, "yyyy-MM-dd"),
-            format(start, "HH:mm"),
-            event.title,
-            event.type,
-            duration.toFixed(2),
-          ].join(",");
-        }),
-      ].join("\n");
+            `Engineer: ${engineerName}`,
+            ["Date", "Time", "Title", "Type", "Duration (hours)"].join(","),
+            ...filteredEvents.map((event) => {
+              const start = new Date(event.start);
+              const end = new Date(event.end);
+              const duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
 
-      // Create and download the file
-      const blob = new Blob([csvContent], { type: "text/csv" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `calendar-report-${format(reportDateRange.from, "yyyy-MM-dd")}-to-${format(reportDateRange.to, "yyyy-MM-dd")}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+              return [
+                format(start, "yyyy-MM-dd"),
+                format(start, "HH:mm"),
+                event.title,
+                event.type,
+                duration.toFixed(2),
+              ].join(",");
+            }),
+            "", // Empty line between engineers
+          ].join("\n");
+        }).join("\n");
+
+        // Create and download the file
+        const blob = new Blob([csvContent], { type: "text/csv" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `all-engineers-calendar-report-${format(
+          reportDateRange.from,
+          "yyyy-MM-dd"
+        )}-to-${format(reportDateRange.to, "yyyy-MM-dd")}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        // Regular engineer report generation (existing code)
+        const filteredEvents = events.filter((event) => {
+          const eventDate = new Date(event.start);
+          return (
+            eventDate >= reportDateRange.from! &&
+            eventDate <= reportDateRange.to!
+          );
+        });
+
+        const csvContent = [
+          ["Date", "Time", "Title", "Type", "Duration (hours)"].join(","),
+          ...filteredEvents.map((event) => {
+            const start = new Date(event.start);
+            const end = new Date(event.end);
+            const duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+
+            return [
+              format(start, "yyyy-MM-dd"),
+              format(start, "HH:mm"),
+              event.title,
+              event.type,
+              duration.toFixed(2),
+            ].join(",");
+          }),
+        ].join("\n");
+
+        const blob = new Blob([csvContent], { type: "text/csv" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `calendar-report-${format(
+          reportDateRange.from,
+          "yyyy-MM-dd"
+        )}-to-${format(reportDateRange.to, "yyyy-MM-dd")}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
 
       setIsReportDialogOpen(false);
       toast({
@@ -329,15 +403,27 @@ export default function EngineerCalendarView() {
     <div className="min-h-screen bg-background p-4">
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">My Schedule</h1>
-          <Button
-            onClick={() => setIsReportDialogOpen(true)}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Download Report
-          </Button>
+          <h1 className="text-2xl font-bold">
+            {user?.isAdmin ? "Schedule Management" : "My Schedule"}
+          </h1>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setIsReportDialogOpen(true)}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Download Report
+            </Button>
+            <Button
+              onClick={() => logoutMutation.mutate()}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </Button>
+          </div>
         </div>
         <div className="grid grid-cols-1 gap-4">
           <ScheduleCalendar
@@ -348,8 +434,10 @@ export default function EngineerCalendarView() {
               setIsDialogOpen(true);
             }}
             onEventUpdate={async (eventData) => {
+              console.log("Event update triggered:", eventData);
               await updateScheduleMutation.mutateAsync(eventData);
             }}
+            isAdmin={user?.isAdmin}
           />
         </div>
       </div>

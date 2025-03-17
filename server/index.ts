@@ -59,18 +59,6 @@ app.use((req, res, next) => {
     }
 
     const port = 5000;
-
-    // Better error handling for server start
-    server.on('error', (error: any) => {
-      if (error.code === 'EADDRINUSE') {
-        log(`Port ${port} is already in use. Please free up the port and try again.`);
-        process.exit(1);
-      } else {
-        log(`Failed to start server: ${error.message}`);
-        throw error;
-      }
-    });
-
     server.listen({
       port,
       host: "0.0.0.0",
@@ -78,6 +66,7 @@ app.use((req, res, next) => {
     }, () => {
       log(`Server started successfully on port ${port}`);
     });
+
   } catch (error) {
     log(`Failed to initialize server: ${(error as Error).message}`);
     process.exit(1);
