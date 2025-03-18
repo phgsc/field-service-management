@@ -95,20 +95,40 @@ export function ScheduleCalendar({ engineerId, events, onEventAdd, onEventUpdate
     }
   });
 
-  // Format events for the calendar
+  // Format events for the calendar with detailed logging
   const calendarEvents = useMemo(() => {
-    return events.map(event => ({
-      id: event.id,
-      title: isAdmin ? `${event.title} - ${event.engineerName}` : event.title,
-      start: event.start,
-      end: event.end,
-      backgroundColor: TASK_TYPES[event.type].color,
-      borderColor: TASK_TYPES[event.type].color,
-      extendedProps: {
-        type: event.type,
-        engineerId: event.engineerId
-      }
-    }));
+    console.log("Formatting calendar events:", {
+      totalEvents: events.length,
+      engineerId,
+      isAdmin
+    });
+
+    const formattedEvents = events.map(event => {
+      const calendarEvent = {
+        id: event.id,
+        title: isAdmin ? `${event.title} - ${event.engineerName}` : event.title,
+        start: event.start,
+        end: event.end,
+        backgroundColor: TASK_TYPES[event.type].color,
+        borderColor: TASK_TYPES[event.type].color,
+        extendedProps: {
+          type: event.type,
+          engineerId: event.engineerId
+        }
+      };
+
+      console.log("Formatted event:", {
+        id: calendarEvent.id,
+        title: calendarEvent.title,
+        start: new Date(calendarEvent.start).toISOString(),
+        end: new Date(calendarEvent.end).toISOString(),
+        type: event.type
+      });
+
+      return calendarEvent;
+    });
+
+    return formattedEvents;
   }, [events, isAdmin]);
 
   // Handle date selection for new events
@@ -296,6 +316,15 @@ export function ScheduleCalendar({ engineerId, events, onEventAdd, onEventUpdate
         allDaySlot={true}
         slotMinTime="06:00:00"
         slotMaxTime="22:00:00"
+        initialDate={new Date()}
+        viewDidMount={(view) => {
+          console.log("Calendar view mounted:", {
+            view: view.view.type,
+            start: view.view.activeStart.toISOString(),
+            end: view.view.activeEnd.toISOString(),
+            visibleEvents: calendarEvents.length
+          });
+        }}
       />
 
       <Dialog open={isEditDialogOpen} onOpenChange={(open) => {

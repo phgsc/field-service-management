@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Loader2, Download } from "lucide-react";
+import { Loader2, Download, LogOut } from "lucide-react";
 import { ScheduleCalendar } from "@/components/schedule-calendar";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AdminNav } from "@/components/admin-nav";
@@ -19,15 +19,21 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
 
 export default function AdminCalendarView() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, logoutMutation } = useAuth();
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportDateRange, setReportDateRange] = useState<{
     from: Date | undefined;
@@ -37,7 +43,6 @@ export default function AdminCalendarView() {
     to: undefined,
   });
 
-  // Debug log to verify component mount
   console.log("AdminCalendarView mounted, user:", user);
 
   // Redirect non-admin users
@@ -45,23 +50,61 @@ export default function AdminCalendarView() {
     return <Redirect to="/" />;
   }
 
-  // Fetch all schedules
+  // Debug log for schedules and engineers data loading
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery({
     queryKey: ["/api/schedules"],
     refetchInterval: 30000, // Refresh every 30 seconds
+    onSuccess: (data) => {
+      console.log("Schedules fetched successfully:", {
+        count: data?.length || 0,
+        dates: data?.map(s => ({
+          id: s.id,
+          title: s.title,
+          start: new Date(s.start).toISOString(),
+          end: new Date(s.end).toISOString()
+        }))
+      });
+    }
   });
 
-  // Fetch all engineers
+  // Debug log for engineers
   const { data: engineers, isLoading: isLoadingEngineers } = useQuery({
     queryKey: ["/api/engineers"],
     enabled: user?.isAdmin,
+    onSuccess: (data) => {
+      console.log("Engineers fetched successfully:", {
+        count: data?.length || 0,
+        engineers: data?.map(e => ({
+          id: e.id,
+          name: e.profile?.name || e.username
+        }))
+      });
+    }
   });
 
-  // Debug log for initial data
-  console.log("Initial data:", {
-    engineersCount: engineers?.length || 0,
-    schedulesCount: schedules?.length || 0,
-  });
+  // Group schedules by engineer with detailed logging
+  const engineerSchedules = useMemo(() => {
+    if (!engineers || !schedules) return {};
+
+    console.log("Grouping schedules by engineer:", {
+      totalSchedules: schedules.length,
+      engineerCount: engineers.length
+    });
+
+    return engineers.reduce((acc, engineer) => {
+      const engineerEvents = schedules.filter(schedule => schedule.engineerId === engineer.id);
+      console.log(`Engineer ${engineer.id} (${engineer.profile?.name || engineer.username}):`, {
+        totalEvents: engineerEvents.length,
+        eventDates: engineerEvents.map(e => ({
+          start: new Date(e.start).toISOString(),
+          end: new Date(e.end).toISOString()
+        }))
+      });
+      acc[engineer.id] = engineerEvents;
+      return acc;
+    }, {} as Record<string, any[]>);
+  }, [schedules, engineers]);
+
 
   const downloadReport = async () => {
     console.log("Download report clicked, opening dialog");
@@ -213,39 +256,55 @@ export default function AdminCalendarView() {
       <AdminNav />
       <div className="mb-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold">Engineer Schedules</h1>
-        <Button
-          onClick={() => {
-            console.log("Download Report button clicked");
-            setIsReportDialogOpen(true);
-          }}
-          variant="outline"
-          className="flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" />
-          Download Report
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setIsReportDialogOpen(true)}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Download Report
+          </Button>
+          <Button
+            onClick={() => logoutMutation.mutate()}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <LogOut className="h-4 w-4" />
+            Logout
+          </Button>
+        </div>
       </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Schedule Management</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[600px]">
-            <ScheduleCalendar
-              events={schedules || []}
-              onEventAdd={async (eventData) => {
-                await addScheduleMutation.mutateAsync(eventData);
-              }}
-              isAdmin={true}
-            />
-          </div>
+          <Tabs defaultValue={engineers?.[0]?.id} className="space-y-4">
+            <TabsList className="gap-2">
+              {engineers?.map(engineer => (
+                <TabsTrigger key={engineer.id} value={engineer.id}>
+                  {engineer.profile?.name || engineer.username}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {engineers?.map(engineer => (
+              <TabsContent key={engineer.id} value={engineer.id}>
+                <div className="h-[600px]">
+                  <ScheduleCalendar
+                    engineerId={engineer.id}
+                    events={engineerSchedules[engineer.id] || []}
+                    isAdmin={true}
+                  />
+                </div>
+              </TabsContent>
+            ))}
+          </Tabs>
         </CardContent>
       </Card>
 
-      <Dialog open={isReportDialogOpen} onOpenChange={(open) => {
-        console.log("Report dialog state changed:", open);
-        setIsReportDialogOpen(open);
-      }}>
+      <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Download Calendar Report</DialogTitle>

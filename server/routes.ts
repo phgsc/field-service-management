@@ -77,6 +77,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const query = req.user.isAdmin ? {} : { engineerId: req.user.id };
       console.log("Schedule query:", query);
       const schedules = await Schedule.find(query).sort({ start: 1 });
+      console.log("Found schedules:", schedules.length);
       res.json(schedules.map(transformSchedule));
     } catch (err) {
       console.error("Schedule fetch error:", err);
