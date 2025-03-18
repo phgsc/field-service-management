@@ -13,7 +13,6 @@ import {insertScheduleSchema} from "@shared/schema"; // Added import for schedul
 import mongoose from 'mongoose'; // Added for ObjectId
 import * as z from 'zod';
 
-
 // Add this helper function at the top of the file
 function transformSchedule(schedule: any) {
   if (!schedule) return null;
@@ -77,7 +76,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const query = req.user.isAdmin ? {} : { engineerId: req.user.id };
       console.log("Schedule query:", query);
       const schedules = await Schedule.find(query).sort({ start: 1 });
-      console.log("Found schedules:", schedules.length);
+      console.log("Found schedules:", {
+        count: schedules.length,
+        oldestSchedule: schedules.length ? new Date(Math.min(...schedules.map(s => new Date(s.start).getTime()))).toISOString() : null,
+        newestSchedule: schedules.length ? new Date(Math.max(...schedules.map(s => new Date(s.start).getTime()))).toISOString() : null,
+        schedules: schedules.map(s => ({
+          id: s._id.toString(),
+          start: new Date(s.start).toISOString(),
+          end: new Date(s.end).toISOString(),
+          engineerId: s.engineerId
+        }))
+      });
       res.json(schedules.map(transformSchedule));
     } catch (err) {
       console.error("Schedule fetch error:", err);

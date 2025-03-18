@@ -79,9 +79,10 @@ interface ScheduleCalendarProps {
     type?: TaskType;
   }) => Promise<void>;
   isAdmin?: boolean;
+  initialDate?: Date;
 }
 
-export function ScheduleCalendar({ engineerId, events, onEventAdd, onEventUpdate, isAdmin }: ScheduleCalendarProps) {
+export function ScheduleCalendar({ engineerId, events, onEventAdd, onEventUpdate, isAdmin, initialDate }: ScheduleCalendarProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
@@ -296,7 +297,7 @@ export function ScheduleCalendar({ engineerId, events, onEventAdd, onEventUpdate
       </style>
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        initialView="timeGridWeek"
+        initialView={isAdmin ? "dayGridMonth" : "timeGridWeek"}
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',
@@ -316,13 +317,18 @@ export function ScheduleCalendar({ engineerId, events, onEventAdd, onEventUpdate
         allDaySlot={true}
         slotMinTime="06:00:00"
         slotMaxTime="22:00:00"
-        initialDate={new Date()}
+        initialDate={initialDate}
         viewDidMount={(view) => {
           console.log("Calendar view mounted:", {
             view: view.view.type,
             start: view.view.activeStart.toISOString(),
             end: view.view.activeEnd.toISOString(),
-            visibleEvents: calendarEvents.length
+            visibleEvents: calendarEvents.length,
+            allEvents: events.map(e => ({
+              id: e.id,
+              start: new Date(e.start).toISOString(),
+              end: new Date(e.end).toISOString()
+            }))
           });
         }}
       />

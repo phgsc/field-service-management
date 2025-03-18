@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Loader2, LogOut } from "lucide-react";
+import { Loader2, LogOut, Download } from "lucide-react";
 import {
   ScheduleCalendar,
   TASK_TYPES,
@@ -227,6 +227,14 @@ export default function EngineerCalendarView() {
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">My Schedule</h1>
           <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setIsDialogOpen(true)}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Download Report
+            </Button>
             <Button
               onClick={() => logoutMutation.mutate()}
               variant="outline"

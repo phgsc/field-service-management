@@ -50,18 +50,21 @@ export default function AdminCalendarView() {
     return <Redirect to="/" />;
   }
 
-  // Debug log for schedules and engineers data loading
+  // Update the schedules query to include debug logging
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery({
     queryKey: ["/api/schedules"],
     refetchInterval: 30000, // Refresh every 30 seconds
     onSuccess: (data) => {
-      console.log("Schedules fetched successfully:", {
+      console.log("Admin schedules fetched successfully:", {
         count: data?.length || 0,
-        dates: data?.map(s => ({
+        oldestDate: data?.length ? new Date(Math.min(...data.map(s => new Date(s.start).getTime()))).toISOString() : null,
+        newestDate: data?.length ? new Date(Math.max(...data.map(s => new Date(s.start).getTime()))).toISOString() : null,
+        schedules: data?.map(s => ({
           id: s.id,
           title: s.title,
           start: new Date(s.start).toISOString(),
-          end: new Date(s.end).toISOString()
+          end: new Date(s.end).toISOString(),
+          engineerId: s.engineerId
         }))
       });
     }
@@ -296,6 +299,9 @@ export default function AdminCalendarView() {
                     engineerId={engineer.id}
                     events={engineerSchedules[engineer.id] || []}
                     isAdmin={true}
+                    initialDate={engineerSchedules[engineer.id]?.length 
+                      ? new Date(Math.min(...engineerSchedules[engineer.id].map(e => new Date(e.start).getTime())))
+                      : new Date()}
                   />
                 </div>
               </TabsContent>
