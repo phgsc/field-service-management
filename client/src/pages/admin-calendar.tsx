@@ -57,20 +57,10 @@ export default function AdminCalendarView() {
     enabled: user?.isAdmin,
   });
 
-  // Add new schedule entry
-  const addScheduleMutation = useMutation({
-    mutationFn: async (scheduleData: {
-      start: Date;
-      end: Date;
-      type: string;
-      allDay: boolean;
-    }) => {
-      const res = await apiRequest("POST", "/api/schedules", scheduleData);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
-    },
+  // Debug log for initial data
+  console.log("Initial data:", {
+    engineersCount: engineers?.length || 0,
+    schedulesCount: schedules?.length || 0,
   });
 
   const downloadReport = async () => {
@@ -93,9 +83,13 @@ export default function AdminCalendarView() {
         throw new Error("No schedule data available");
       }
 
+      // Set date range boundaries for consistent filtering
+      const rangeStart = startOfDay(reportDateRange.from);
+      const rangeEnd = endOfDay(reportDateRange.to);
+
       console.log("Generating report with date range:", {
-        from: reportDateRange.from,
-        to: reportDateRange.to,
+        from: rangeStart.toISOString(),
+        to: rangeEnd.toISOString(),
         engineersCount: engineers.length,
         schedulesCount: schedules.length
       });
@@ -111,18 +105,17 @@ export default function AdminCalendarView() {
           // Debug log for date filtering
           console.log("Checking event:", {
             eventId: event.id,
-            eventStart: eventDate,
+            eventStart: eventDate.toISOString(),
             dateRange: {
-              from: startOfDay(reportDateRange.from!),
-              to: endOfDay(reportDateRange.to!)
+              from: rangeStart.toISOString(),
+              to: rangeEnd.toISOString()
             },
-            isInRange: eventDate >= startOfDay(reportDateRange.from!) &&
-                      eventDate <= endOfDay(reportDateRange.to!),
+            isInRange: eventDate >= rangeStart && eventDate <= rangeEnd,
             belongsToEngineer: event.engineerId === engineer.id
           });
           return event.engineerId === engineer.id &&
-                 eventDate >= startOfDay(reportDateRange.from!) &&
-                 eventDate <= endOfDay(reportDateRange.to!);
+                 eventDate >= rangeStart &&
+                 eventDate <= rangeEnd;
         });
 
         console.log("Engineer events filtered:", {
@@ -136,7 +129,7 @@ export default function AdminCalendarView() {
         const sheetData = [
           ["Engineer Schedule Report"],
           [`Name: ${engineer.profile?.name || engineer.username || 'Unknown Engineer'}`],
-          [`Date Range: ${format(reportDateRange.from!, "PPP")} to ${format(reportDateRange.to!, "PPP")}`],
+          [`Date Range: ${format(rangeStart, "PPP")} to ${format(rangeEnd, "PPP")}`],
           [], // Empty row
           ["Date", "Time", "Title", "Type", "Duration (hours)"]
         ];
@@ -186,7 +179,7 @@ export default function AdminCalendarView() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `engineer-schedules-${format(reportDateRange.from, "yyyy-MM-dd")}-to-${format(reportDateRange.to, "yyyy-MM-dd")}.xlsx`;
+      a.download = `engineer-schedules-${format(rangeStart, "yyyy-MM-dd")}-to-${format(rangeEnd, "yyyy-MM-dd")}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

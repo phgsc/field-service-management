@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { createServer } from "net";
+import mongoose from 'mongoose';
 
 const app = express();
 app.use(express.json());
@@ -42,7 +43,18 @@ app.use((req, res, next) => {
   try {
     log("Starting server initialization...");
 
+    // Connect to MongoDB
+    const mongoURI = process.env.MONGODB_URI;
+    if (!mongoURI) {
+      throw new Error("MONGODB_URI not defined in environment");
+    }
+    log("Connecting to MongoDB...");
+    await mongoose.connect(mongoURI);
+    log("Connected to MongoDB successfully");
+
+    log("Registering routes...");
     const server = await registerRoutes(app);
+    log("Routes registered successfully");
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
@@ -52,9 +64,12 @@ app.use((req, res, next) => {
       console.error(err);
     });
 
+    // Temporarily disable Vite setup for testing
     if (app.get("env") === "development") {
-      log("Setting up Vite in development mode...");
-      await setupVite(app, server);
+      log("Development mode detected - Vite setup temporarily disabled for testing");
+      // await setupVite(app, server);
+      // Serve static files directly for now
+      app.use(express.static("client/dist"));
     } else {
       log("Setting up static serving for production...");
       serveStatic(app);
