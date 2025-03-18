@@ -30,6 +30,7 @@ import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
+import type { TaskType } from "@/components/schedule-calendar";
 
 export default function AdminCalendarView() {
   const { toast } = useToast();
@@ -70,6 +71,27 @@ export default function AdminCalendarView() {
     }
   });
 
+  // Add visits query
+  const { data: visits, isLoading: isLoadingVisits } = useQuery({
+    queryKey: ["/api/visits"],
+    enabled: user?.isAdmin,
+    refetchInterval: 30000,
+    onSuccess: (data) => {
+      console.log("Admin visits fetched successfully:", {
+        count: data?.length || 0,
+        visits: data?.map(v => ({
+          id: v.id,
+          status: v.status,
+          journeyStartTime: v.journeyStartTime,
+          journeyEndTime: v.journeyEndTime,
+          serviceStartTime: v.serviceStartTime,
+          serviceEndTime: v.serviceEndTime,
+          userId: v.userId
+        }))
+      });
+    }
+  });
+
   // Debug log for engineers
   const { data: engineers, isLoading: isLoadingEngineers } = useQuery({
     queryKey: ["/api/engineers"],
@@ -85,29 +107,67 @@ export default function AdminCalendarView() {
     }
   });
 
-  // Group schedules by engineer with detailed logging
+  // Group schedules and visits by engineer with detailed logging
   const engineerSchedules = useMemo(() => {
     if (!engineers || !schedules) return {};
 
-    console.log("Grouping schedules by engineer:", {
+    console.log("Grouping schedules and visits by engineer:", {
       totalSchedules: schedules.length,
+      totalVisits: visits?.length || 0,
       engineerCount: engineers.length
     });
 
     return engineers.reduce((acc, engineer) => {
+      const allEvents = [];
+
+      // Add scheduled events
       const engineerEvents = schedules.filter(schedule => schedule.engineerId === engineer.id);
+      allEvents.push(...engineerEvents);
+
+      // Add visit events if available
+      if (visits && Array.isArray(visits)) {
+        const engineerVisits = visits.filter(visit => visit.userId === engineer.id);
+        engineerVisits.forEach(visit => {
+          if (visit.journeyStartTime && visit.journeyEndTime) {
+            allEvents.push({
+              id: `journey-${visit.id}`,
+              title: "Journey to Site",
+              start: new Date(visit.journeyStartTime),
+              end: new Date(visit.journeyEndTime),
+              type: "journey" as TaskType,
+              engineerId: visit.userId,
+              engineerName: engineer.profile?.name || engineer.username || "",
+            });
+          }
+
+          if (visit.serviceStartTime && visit.serviceEndTime) {
+            allEvents.push({
+              id: `service-${visit.id}`,
+              title: `Service Visit - ${visit.jobId}`,
+              start: new Date(visit.serviceStartTime),
+              end: new Date(visit.serviceEndTime),
+              type: "service" as TaskType,
+              engineerId: visit.userId,
+              engineerName: engineer.profile?.name || engineer.username || "",
+            });
+          }
+        });
+      }
+
       console.log(`Engineer ${engineer.id} (${engineer.profile?.name || engineer.username}):`, {
-        totalEvents: engineerEvents.length,
-        eventDates: engineerEvents.map(e => ({
+        scheduledEvents: engineerEvents.length,
+        visitEvents: visits?.filter(v => v.userId === engineer.id).length || 0,
+        totalEvents: allEvents.length,
+        eventDates: allEvents.map(e => ({
           start: new Date(e.start).toISOString(),
           end: new Date(e.end).toISOString()
         }))
       });
-      acc[engineer.id] = engineerEvents;
+
+      acc[engineer.id] = allEvents;
       return acc;
     }, {} as Record<string, any[]>);
-  }, [schedules, engineers]);
-
+  }, [schedules, visits, engineers]);
 
   const downloadReport = async () => {
     console.log("Download report clicked, opening dialog");
@@ -125,10 +185,6 @@ export default function AdminCalendarView() {
         throw new Error("No engineer data available");
       }
 
-      if (!schedules || !Array.isArray(schedules)) {
-        throw new Error("No schedule data available");
-      }
-
       // Set date range boundaries for consistent filtering
       const rangeStart = startOfDay(reportDateRange.from);
       const rangeEnd = endOfDay(reportDateRange.to);
@@ -137,7 +193,7 @@ export default function AdminCalendarView() {
         from: rangeStart.toISOString(),
         to: rangeEnd.toISOString(),
         engineersCount: engineers.length,
-        schedulesCount: schedules.length
+        totalEvents: Object.values(engineerSchedules).reduce((sum, events) => sum + events.length, 0)
       });
 
       // Create a new workbook
@@ -145,30 +201,19 @@ export default function AdminCalendarView() {
 
       // Process each engineer
       engineers.forEach(engineer => {
+        const engineerEvents = engineerSchedules[engineer.id] || [];
+
         // Filter events for this engineer within the date range
-        const engineerEvents = schedules.filter(event => {
+        const filteredEvents = engineerEvents.filter(event => {
           const eventDate = new Date(event.start);
-          // Debug log for date filtering
-          console.log("Checking event:", {
-            eventId: event.id,
-            eventStart: eventDate.toISOString(),
-            dateRange: {
-              from: rangeStart.toISOString(),
-              to: rangeEnd.toISOString()
-            },
-            isInRange: eventDate >= rangeStart && eventDate <= rangeEnd,
-            belongsToEngineer: event.engineerId === engineer.id
-          });
-          return event.engineerId === engineer.id &&
-                 eventDate >= rangeStart &&
-                 eventDate <= rangeEnd;
+          return eventDate >= rangeStart && eventDate <= rangeEnd;
         });
 
         console.log("Engineer events filtered:", {
           engineerId: engineer.id,
           engineerName: engineer.profile?.name || engineer.username,
-          totalEvents: schedules.filter(e => e.engineerId === engineer.id).length,
-          filteredEvents: engineerEvents.length
+          totalEvents: engineerEvents.length,
+          filteredEvents: filteredEvents.length
         });
 
         // Create data for this engineer's sheet
@@ -180,8 +225,8 @@ export default function AdminCalendarView() {
           ["Date", "Time", "Title", "Type", "Duration (hours)"]
         ];
 
-        if (engineerEvents.length > 0) {
-          engineerEvents.forEach(event => {
+        if (filteredEvents.length > 0) {
+          filteredEvents.forEach(event => {
             const start = new Date(event.start);
             const end = new Date(event.end);
             const duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
@@ -246,7 +291,7 @@ export default function AdminCalendarView() {
     }
   };
 
-  if (isLoadingSchedules || isLoadingEngineers) {
+  if (isLoadingSchedules || isLoadingEngineers || isLoadingVisits) {
     return (
       <div className="min-h-screen bg-background p-4 flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
