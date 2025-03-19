@@ -89,9 +89,20 @@ const scheduleSchema = new mongoose.Schema({
 // System Settings Schema
 const systemSettingsSchema = new mongoose.Schema({
   gamificationEnabled: { type: Boolean, default: true },
-  lastUpdated: { type: Date, required: true },
+  lastUpdated: { type: Date, required: true, default: Date.now },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 });
+
+systemSettingsSchema.pre('save', function(next) {
+  this.lastUpdated = new Date();
+  next();
+});
+
+systemSettingsSchema.pre('findOneAndUpdate', function(next) {
+  this.set({ lastUpdated: new Date() });
+  next();
+});
+
 
 // Achievement Schema
 const achievementSchema = new mongoose.Schema({

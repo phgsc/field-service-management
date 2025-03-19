@@ -132,17 +132,49 @@ export class MongoStorage implements IStorage {
   }
 
   async getSystemSettings(): Promise<SystemSettings | undefined> {
-    const settings = await SystemSettingsModel.findOne();
+    // Try to get existing settings
+    let settings = await SystemSettingsModel.findOne();
+
+    // If no settings exist, create default settings
+    if (!settings) {
+      try {
+        // Get any admin user to set as the updatedBy
+        const adminUser = await UserModel.findOne({ isAdmin: true });
+        if (!adminUser) {
+          console.error("No admin user found to initialize system settings");
+          return undefined;
+        }
+
+        settings = await SystemSettingsModel.create({
+          gamificationEnabled: true,
+          lastUpdated: new Date(),
+          updatedBy: adminUser._id
+        });
+      } catch (err) {
+        console.error("Failed to create initial system settings:", err);
+        return undefined;
+      }
+    }
+
     return settings ? convertDocument<SystemSettings>(settings) : undefined;
   }
 
   async updateSystemSettings(settings: Partial<SystemSettings>): Promise<SystemSettings> {
-    const updatedSettings = await SystemSettingsModel.findOneAndUpdate(
-      {},
-      { $set: settings },
-      { new: true, upsert: true }
-    );
-    return convertDocument<SystemSettings>(updatedSettings);
+    const existingSettings = await SystemSettingsModel.findOne();
+
+    if (existingSettings) {
+      // Update existing settings
+      const updatedSettings = await SystemSettingsModel.findOneAndUpdate(
+        {},
+        { $set: settings },
+        { new: true }
+      );
+      return convertDocument<SystemSettings>(updatedSettings);
+    } else {
+      // Create new settings if none exist
+      const newSettings = await SystemSettingsModel.create(settings);
+      return convertDocument<SystemSettings>(newSettings);
+    }
   }
 
   async getAchievements(userId: string): Promise<Achievement[]> {
