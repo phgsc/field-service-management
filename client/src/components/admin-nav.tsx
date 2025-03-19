@@ -38,6 +38,14 @@ export function AdminNav() {
           Admin Users
         </a>
       </Link>
+      <Link href="/admin-settings">
+        <a className={cn(
+          "px-3 py-2 rounded-lg hover:bg-accent",
+          location === "/admin-settings" ? "bg-accent" : "transparent"
+        )}>
+          Settings
+        </a>
+      </Link>
     </nav>
   );
 }

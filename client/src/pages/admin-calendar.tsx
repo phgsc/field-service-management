@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { format, startOfDay, endOfDay } from "date-fns";
-import * as XLSX from 'xlsx';
+import * as ExcelJS from 'exceljs';
 import {
   Dialog,
   DialogContent,
@@ -44,89 +44,44 @@ export default function AdminCalendarView() {
     to: undefined,
   });
 
-  console.log("AdminCalendarView mounted, user:", user);
-
   // Redirect non-admin users
   if (!user?.isAdmin) {
     return <Redirect to="/" />;
   }
 
-  // Update the schedules query to include debug logging
+  // Query schedules
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery({
     queryKey: ["/api/schedules"],
-    refetchInterval: 30000, // Refresh every 30 seconds
-    onSuccess: (data) => {
-      console.log("Admin schedules fetched successfully:", {
-        count: data?.length || 0,
-        oldestDate: data?.length ? new Date(Math.min(...data.map(s => new Date(s.start).getTime()))).toISOString() : null,
-        newestDate: data?.length ? new Date(Math.max(...data.map(s => new Date(s.start).getTime()))).toISOString() : null,
-        schedules: data?.map(s => ({
-          id: s.id,
-          title: s.title,
-          start: new Date(s.start).toISOString(),
-          end: new Date(s.end).toISOString(),
-          engineerId: s.engineerId
-        }))
-      });
-    }
+    refetchInterval: 30000
   });
 
-  // Add visits query
+  // Query visits
   const { data: visits, isLoading: isLoadingVisits } = useQuery({
     queryKey: ["/api/visits"],
     enabled: user?.isAdmin,
-    refetchInterval: 30000,
-    onSuccess: (data) => {
-      console.log("Admin visits fetched successfully:", {
-        count: data?.length || 0,
-        visits: data?.map(v => ({
-          id: v.id,
-          status: v.status,
-          journeyStartTime: v.journeyStartTime,
-          journeyEndTime: v.journeyEndTime,
-          serviceStartTime: v.serviceStartTime,
-          serviceEndTime: v.serviceEndTime,
-          userId: v.userId
-        }))
-      });
-    }
+    refetchInterval: 30000
   });
 
-  // Debug log for engineers
+  // Query engineers
   const { data: engineers, isLoading: isLoadingEngineers } = useQuery({
     queryKey: ["/api/engineers"],
-    enabled: user?.isAdmin,
-    onSuccess: (data) => {
-      console.log("Engineers fetched successfully:", {
-        count: data?.length || 0,
-        engineers: data?.map(e => ({
-          id: e.id,
-          name: e.profile?.name || e.username
-        }))
-      });
-    }
+    enabled: user?.isAdmin
   });
 
-  // Group schedules and visits by engineer with detailed logging
+  // Group schedules and visits by engineer
   const engineerSchedules = useMemo(() => {
     if (!engineers || !schedules) return {};
 
-    console.log("Grouping schedules and visits by engineer:", {
-      totalSchedules: schedules.length,
-      totalVisits: visits?.length || 0,
-      engineerCount: engineers.length
-    });
-
-    return engineers.reduce((acc, engineer) => {
+    return engineers.reduce((acc: Record<string, any[]>, engineer) => {
       const allEvents = [];
 
       // Add scheduled events
-      const engineerEvents = schedules.filter(schedule => schedule.engineerId === engineer.id);
+      const engineerEvents = schedules.filter((schedule: any) => schedule.engineerId === engineer.id);
       allEvents.push(...engineerEvents);
 
       // Add visit events if available
       if (visits && Array.isArray(visits)) {
-        const engineerVisits = visits.filter(visit => visit.userId === engineer.id);
+        const engineerVisits = visits.filter((visit: any) => visit.userId === engineer.id);
         engineerVisits.forEach(visit => {
           if (visit.journeyStartTime && visit.journeyEndTime) {
             allEvents.push({
@@ -154,23 +109,12 @@ export default function AdminCalendarView() {
         });
       }
 
-      console.log(`Engineer ${engineer.id} (${engineer.profile?.name || engineer.username}):`, {
-        scheduledEvents: engineerEvents.length,
-        visitEvents: visits?.filter(v => v.userId === engineer.id).length || 0,
-        totalEvents: allEvents.length,
-        eventDates: allEvents.map(e => ({
-          start: new Date(e.start).toISOString(),
-          end: new Date(e.end).toISOString()
-        }))
-      });
-
       acc[engineer.id] = allEvents;
       return acc;
-    }, {} as Record<string, any[]>);
+    }, {});
   }, [schedules, visits, engineers]);
 
   const downloadReport = async () => {
-    console.log("Download report clicked, opening dialog");
     if (!reportDateRange.from || !reportDateRange.to) {
       toast({
         title: "Date range required",
@@ -189,18 +133,13 @@ export default function AdminCalendarView() {
       const rangeStart = startOfDay(reportDateRange.from);
       const rangeEnd = endOfDay(reportDateRange.to);
 
-      console.log("Generating report with date range:", {
-        from: rangeStart.toISOString(),
-        to: rangeEnd.toISOString(),
-        engineersCount: engineers.length,
-        totalEvents: Object.values(engineerSchedules).reduce((sum, events) => sum + events.length, 0)
-      });
-
       // Create a new workbook
-      const workbook = XLSX.utils.book_new();
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Field Service Management';
+      workbook.created = new Date();
 
       // Process each engineer
-      engineers.forEach(engineer => {
+      for (const engineer of engineers) {
         const engineerEvents = engineerSchedules[engineer.id] || [];
 
         // Filter events for this engineer within the date range
@@ -209,64 +148,64 @@ export default function AdminCalendarView() {
           return eventDate >= rangeStart && eventDate <= rangeEnd;
         });
 
-        console.log("Engineer events filtered:", {
-          engineerId: engineer.id,
-          engineerName: engineer.profile?.name || engineer.username,
-          totalEvents: engineerEvents.length,
-          filteredEvents: filteredEvents.length
-        });
+        // Create worksheet for this engineer
+        const sheetName = (engineer.profile?.name || engineer.username || 'Unknown')
+          .slice(0, 30) // Excel sheet names limited to 31 chars
+          .replace(/[\[\]\*\/\\\?\:]/g, ''); // Remove invalid chars
 
-        // Create data for this engineer's sheet
-        const sheetData = [
-          ["Engineer Schedule Report"],
-          [`Name: ${engineer.profile?.name || engineer.username || 'Unknown Engineer'}`],
-          [`Date Range: ${format(rangeStart, "PPP")} to ${format(rangeEnd, "PPP")}`],
-          [], // Empty row
-          ["Date", "Time", "Title", "Type", "Duration (hours)"]
-        ];
+        const worksheet = workbook.addWorksheet(sheetName);
 
+        // Add header with styling
+        worksheet.mergeCells('A1:E1');
+        const titleRow = worksheet.getRow(1);
+        titleRow.getCell(1).value = 'Engineer Schedule Report';
+        titleRow.font = { bold: true, size: 14 };
+
+        // Add engineer info
+        worksheet.mergeCells('A2:E2');
+        worksheet.getCell('A2').value = `Name: ${engineer.profile?.name || engineer.username || 'Unknown Engineer'}`;
+
+        worksheet.mergeCells('A3:E3');
+        worksheet.getCell('A3').value = `Date Range: ${format(rangeStart, "PPP")} to ${format(rangeEnd, "PPP")}`;
+
+        // Add headers
+        worksheet.getRow(5).values = ['Date', 'Time', 'Title', 'Type', 'Duration (hours)'];
+        worksheet.getRow(5).font = { bold: true };
+
+        // Add data
         if (filteredEvents.length > 0) {
+          let rowIndex = 6;
           filteredEvents.forEach(event => {
             const start = new Date(event.start);
             const end = new Date(event.end);
             const duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
 
-            sheetData.push([
+            worksheet.getRow(rowIndex).values = [
               format(start, "yyyy-MM-dd"),
               format(start, "HH:mm"),
               event.title,
               event.type,
               Number(duration.toFixed(2))
-            ]);
+            ];
+            rowIndex++;
           });
         } else {
-          sheetData.push(["No events in selected date range"]);
+          worksheet.getCell('A6').value = 'No events in selected date range';
         }
 
-        // Create worksheet and add to workbook
-        const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
-
         // Set column widths
-        const colWidths = [{ wch: 12 }, { wch: 8 }, { wch: 30 }, { wch: 15 }, { wch: 15 }];
-        worksheet['!cols'] = colWidths;
+        worksheet.columns = [
+          { width: 12 }, // Date
+          { width: 8 },  // Time
+          { width: 30 }, // Title
+          { width: 15 }, // Type
+          { width: 15 }  // Duration
+        ];
+      }
 
-        // Add the worksheet to the workbook
-        const sheetName = (engineer.profile?.name || engineer.username || 'Unknown')
-          .slice(0, 30) // Excel sheet names limited to 31 chars
-          .replace(/[\[\]\*\/\\\?\:]/g, ''); // Remove invalid chars
-
-        console.log("Adding sheet for engineer:", {
-          engineerId: engineer.id,
-          sheetName,
-          rowCount: sheetData.length
-        });
-
-        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-      });
-
-      // Generate Excel file
-      const excelBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
-      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      // Generate blob and download
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -423,10 +362,7 @@ export default function AdminCalendarView() {
               </div>
             </div>
             <Button
-              onClick={() => {
-                console.log("Download report button clicked with dates:", reportDateRange);
-                downloadReport();
-              }}
+              onClick={downloadReport}
               className="w-full"
               disabled={!reportDateRange.from || !reportDateRange.to}
             >
