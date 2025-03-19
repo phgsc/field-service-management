@@ -66,10 +66,8 @@ app.use((req, res, next) => {
 
     // Temporarily disable Vite setup for testing
     if (app.get("env") === "development") {
-      log("Development mode detected - Vite setup temporarily disabled for testing");
-      // await setupVite(app, server);
-      // Serve static files directly for now
-      app.use(express.static("client/dist"));
+      log("Development mode detected - Setting up Vite...");
+      await setupVite(app, server);
     } else {
       log("Setting up static serving for production...");
       serveStatic(app);
