@@ -101,22 +101,25 @@ export default function EngineerView() {
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const { toast } = useToast();
 
-  // Query for achievements
+  // First query system settings
+  const { data: settings, isLoading: isLoadingSettings } = useQuery({
+    queryKey: ["/api/settings"]
+  });
+
+  // Only query gamification data if it's enabled
   const { data: achievements } = useQuery<Achievement[]>({
     queryKey: [`/api/achievements`, user?.id],
-    enabled: !!user?.id
+    enabled: !!user?.id && !!settings?.gamificationEnabled
   });
 
-  // Query for points
   const { data: points } = useQuery<Points[]>({
     queryKey: [`/api/points`, user?.id],
-    enabled: !!user?.id
+    enabled: !!user?.id && !!settings?.gamificationEnabled
   });
 
-  // Query for weekly stats
   const { data: weeklyStats } = useQuery({
     queryKey: [`/api/engineers/${user?.id}/weekly-stats`],
-    enabled: !!user?.id
+    enabled: !!user?.id && !!settings?.gamificationEnabled
   });
 
   const { data: visits } = useQuery<Visit[]>({
@@ -286,17 +289,21 @@ export default function EngineerView() {
     [ServiceStatus.ON_ROUTE, ServiceStatus.IN_SERVICE].includes(v.status as keyof typeof ServiceStatus) &&
     v.userId === user?.id
   );
+  const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
+  const [isResumeDialogOpen, setIsResumeDialogOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="space-y-4">
         {/* Performance Dashboard */}
-        <PerformanceDashboard
-          user={user!}
-          achievements={achievements || []}
-          points={points || []}
-          weeklyStats={weeklyStats || null}
-        />
+        {settings?.gamificationEnabled && (
+          <PerformanceDashboard
+            user={user!}
+            achievements={achievements || []}
+            points={points || []}
+            weeklyStats={weeklyStats || null}
+          />
+        )}
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">

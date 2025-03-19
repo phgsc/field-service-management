@@ -41,14 +41,13 @@ export function PerformanceDashboard({
   points,
   weeklyStats 
 }: PerformanceDashboardProps) {
-  // Query for system settings to check if gamification is enabled
-  const { data: settings } = useQuery({
-    queryKey: ["/api/settings"],
-    enabled: user?.isAdmin // Only fetch settings if user is admin
+  // Query for system settings
+  const { data: settings, isLoading: isLoadingSettings } = useQuery({
+    queryKey: ["/api/settings"]
   });
 
-  // If gamification is disabled, don't render the dashboard
-  if (settings?.gamificationEnabled === false) {
+  // If settings are loading or gamification is disabled, don't render
+  if (isLoadingSettings || settings?.gamificationEnabled === false) {
     return null;
   }
 
