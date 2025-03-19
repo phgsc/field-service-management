@@ -81,6 +81,7 @@ export interface User {
     designation?: string;
     lastPasswordReset?: Date;
   };
+  gamification?: UserGamification;
 }
 
 export interface Location {
@@ -116,8 +117,8 @@ export const insertScheduleSchema = z.object({
   engineerName: z.string(),
   title: z.string().min(1, "Title is required"),
   type: z.enum([
-    'journey', 'service', 'admin', 'sales-call', 'sales-visit', 
-    'research', 'day-off', 'vacation', 'public-holiday', 
+    'journey', 'service', 'admin', 'sales-call', 'sales-visit',
+    'research', 'day-off', 'vacation', 'public-holiday',
     'weekly-off', 'in-office'
   ]),
   start: z.string().or(z.date()),
@@ -137,3 +138,92 @@ export interface Schedule {
 }
 
 export type InsertSchedule = z.infer<typeof insertScheduleSchema>;
+
+export const AchievementType = {
+  SPEED_DEMON: 'speed_demon',         // Fast service completion
+  ROAD_WARRIOR: 'road_warrior',       // Efficient journey times
+  TASK_MASTER: 'task_master',         // High number of completed tasks
+  PERFECT_WEEK: 'perfect_week',       // All tasks completed on time in a week
+  FIRST_RESPONSE: 'first_response',   // Quick response to new tasks
+  CONSISTENCY_KING: 'consistency_king' // Maintaining consistent performance
+} as const;
+
+export const insertAchievementSchema = z.object({
+  userId: z.string(),
+  type: z.enum([
+    AchievementType.SPEED_DEMON,
+    AchievementType.ROAD_WARRIOR,
+    AchievementType.TASK_MASTER,
+    AchievementType.PERFECT_WEEK,
+    AchievementType.FIRST_RESPONSE,
+    AchievementType.CONSISTENCY_KING
+  ]),
+  earnedAt: z.date(),
+  metadata: z.object({
+    visitId: z.string().optional(),
+    criteria: z.string(),
+    value: z.number()
+  }).optional()
+});
+
+export const insertPointsSchema = z.object({
+  userId: z.string(),
+  amount: z.number(),
+  reason: z.string(),
+  timestamp: z.date(),
+  visitId: z.string().optional()
+});
+
+export interface Achievement {
+  id: string;
+  userId: string;
+  type: keyof typeof AchievementType;
+  earnedAt: Date;
+  metadata?: {
+    visitId?: string;
+    criteria: string;
+    value: number;
+  };
+}
+
+export interface Points {
+  id: string;
+  userId: string;
+  amount: number;
+  reason: string;
+  timestamp: Date;
+  visitId?: string;
+}
+
+export type InsertAchievement = z.infer<typeof insertAchievementSchema>;
+export type InsertPoints = z.infer<typeof insertPointsSchema>;
+
+// Add gamification-related fields to User interface
+export interface UserGamification {
+  totalPoints: number;
+  achievements: Achievement[];
+  weeklyStats?: {
+    completedVisits: number;
+    avgServiceTime: number;
+    avgJourneyTime: number;
+    pointsEarned: number;
+  };
+  rank?: string; // Based on total points
+}
+
+// Add system settings schema
+export const systemSettingsSchema = z.object({
+  id: z.string(),
+  gamificationEnabled: z.boolean().default(true),
+  lastUpdated: z.date(),
+  updatedBy: z.string() // Admin user ID who last updated settings
+});
+
+export interface SystemSettings {
+  id: string;
+  gamificationEnabled: boolean;
+  lastUpdated: Date;
+  updatedBy: string;
+}
+
+export type InsertSystemSettings = z.infer<typeof systemSettingsSchema>;

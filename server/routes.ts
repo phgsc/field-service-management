@@ -12,6 +12,8 @@ import { Schedule } from "./db"; // Added import statement
 import {insertScheduleSchema} from "@shared/schema"; // Added import for schedule schema
 import mongoose from 'mongoose'; // Added for ObjectId
 import * as z from 'zod';
+import { startOfWeek, endOfWeek } from 'date-fns'; // Added import for date-fns functions
+import { systemSettingsSchema } from "@shared/schema";
 
 // Add this helper function at the top of the file
 function transformSchedule(schedule: any) {
@@ -525,6 +527,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).send((err as Error).message);
     }
   });
+
+  // Add the gamification endpoints
+  app.get("/api/settings", requireAdmin, async (req, res) => {
+    try {
+      const settings = await storage.getSystemSettings();
+      res.json(settings);
+    } catch (err) {
+      res.status(500).send((err as Error).message);
+    }
+  });
+
+  app.patch("/api/settings/gamification", requireAdmin, async (req, res) => {
+    try {
+      const { enabled } = z.object({ enabled: z.boolean() }).parse(req.body);
+      const settings = await storage.updateSystemSettings({
+        gamificationEnabled: enabled,
+        lastUpdated: new Date(),
+        updatedBy: req.user.id
+      });
+      res.json(settings);
+    } catch (err) {
+      res.status(500).send((err as Error).message);
+    }
+  });
+
+  app.get("/api/achievements/:userId", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    try {
+      // Check if gamification is enabled
+      const settings = await storage.getSystemSettings();
+      if (!settings?.gamificationEnabled) {
+        return res.status(403).send("Gamification is currently disabled");
+      }
+
+      // Only allow users to view their own achievements or admins to view any
+      if (!req.user.isAdmin && req.params.userId !== req.user.id) {
+        return res.status(403).send("Not authorized to view these achievements");
+      }
+      const achievements = await storage.getAchievements(req.params.userId);
+      res.json(achievements);
+    } catch (err) {
+      res.status(500).send((err as Error).message);
+    }
+  });
+
+  app.get("/api/points/:userId", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    try {
+      // Check if gamification is enabled
+      const settings = await storage.getSystemSettings();
+      if (!settings?.gamificationEnabled) {
+        return res.status(403).send("Gamification is currently disabled");
+      }
+
+      // Only allow users to view their own points or admins to view any
+      if (!req.user.isAdmin && req.params.userId !== req.user.id) {
+        return res.status(403).send("Not authorized to view these points");
+      }
+      const points = await storage.getPoints(req.params.userId);
+      res.json(points);
+    } catch (err) {
+      res.status(500).send((err as Error).message);
+    }
+  });
+
+  app.get("/api/engineers/:id/weekly-stats", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    try {
+      // Check if gamification is enabled
+      const settings = await storage.getSystemSettings();
+      if (!settings?.gamificationEnabled) {
+        return res.status(403).send("Gamification is currently disabled");
+      }
+
+      const weekStart = startOfWeek(new Date());
+      const weekEnd = endOfWeek(new Date());
+
+      // Get visits within the week
+      const weeklyVisits = await storage.getVisitsByDateRange(
+        req.params.id,
+        weekStart,
+        weekEnd
+      );
+
+      // Calculate statistics
+      const completedVisits = weeklyVisits.filter(
+        v => v.status === ServiceStatus.COMPLETED
+      ).length;
+
+      const serviceTimeSum = weeklyVisits.reduce(
+        (sum, v) => sum + (v.totalServiceTime || 0),
+        0
+      );
+
+      const journeyTimeSum = weeklyVisits.reduce(
+        (sum, v) => sum + (v.totalJourneyTime || 0),
+        0
+      );
+
+      const weeklyStats = {
+        completedVisits,
+        avgServiceTime: completedVisits ? serviceTimeSum / completedVisits : 0,
+        avgJourneyTime: completedVisits ? journeyTimeSum / completedVisits : 0,
+        pointsEarned: await storage.getWeeklyPoints(req.params.id, weekStart, weekEnd)
+      };
+
+      res.json(weeklyStats);
+    } catch (err) {
+      res.status(500).send((err as Error).message);
+    }
+  });
+
 
   const httpServer = createServer(app);
   return httpServer;

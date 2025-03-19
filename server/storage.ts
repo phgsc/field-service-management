@@ -1,6 +1,6 @@
-import type { User, InsertUser, Location, InsertLocation, Visit, InsertVisit, UpdateProfile } from "@shared/schema";
+import type { User, InsertUser, Location, InsertLocation, Visit, InsertVisit, UpdateProfile, SystemSettings, Achievement, Points } from "@shared/schema";
 import session from "express-session";
-import { User as UserModel, Location as LocationModel, Visit as VisitModel } from "./db";
+import { User as UserModel, Location as LocationModel, Visit as VisitModel, SystemSettings as SystemSettingsModel, Achievement as AchievementModel, Points as PointsModel } from "./db";
 import createMemoryStore from "memorystore";
 import { hashPassword } from "./auth";
 
@@ -21,6 +21,12 @@ export interface IStorage {
   getAdmins(): Promise<User[]>;
   getVisit(id: string): Promise<Visit | undefined>;
   sessionStore: session.Store;
+  getSystemSettings(): Promise<SystemSettings | undefined>;
+  updateSystemSettings(settings: Partial<SystemSettings>): Promise<SystemSettings>;
+  getAchievements(userId: string): Promise<Achievement[]>;
+  getPoints(userId: string): Promise<Points[]>;
+  getVisitsByDateRange(userId: string, startDate: Date, endDate: Date): Promise<Visit[]>;
+  getWeeklyPoints(userId: string, startDate: Date, endDate: Date): Promise<number>;
 }
 
 // Helper function to convert MongoDB document to our interface type
@@ -123,6 +129,46 @@ export class MongoStorage implements IStorage {
   async getVisit(id: string): Promise<Visit | undefined> {
     const visit = await VisitModel.findById(id);
     return visit ? convertDocument<Visit>(visit) : undefined;
+  }
+
+  async getSystemSettings(): Promise<SystemSettings | undefined> {
+    const settings = await SystemSettingsModel.findOne();
+    return settings ? convertDocument<SystemSettings>(settings) : undefined;
+  }
+
+  async updateSystemSettings(settings: Partial<SystemSettings>): Promise<SystemSettings> {
+    const updatedSettings = await SystemSettingsModel.findOneAndUpdate(
+      {},
+      { $set: settings },
+      { new: true, upsert: true }
+    );
+    return convertDocument<SystemSettings>(updatedSettings);
+  }
+
+  async getAchievements(userId: string): Promise<Achievement[]> {
+    const achievements = await AchievementModel.find({ userId });
+    return achievements.map(achievement => convertDocument<Achievement>(achievement));
+  }
+
+  async getPoints(userId: string): Promise<Points[]> {
+    const points = await PointsModel.find({ userId });
+    return points.map(point => convertDocument<Points>(point));
+  }
+
+  async getVisitsByDateRange(userId: string, startDate: Date, endDate: Date): Promise<Visit[]> {
+    const visits = await VisitModel.find({
+      userId,
+      startTime: { $gte: startDate, $lte: endDate }
+    });
+    return visits.map(visit => convertDocument<Visit>(visit));
+  }
+
+  async getWeeklyPoints(userId: string, startDate: Date, endDate: Date): Promise<number> {
+    const points = await PointsModel.find({
+      userId,
+      timestamp: { $gte: startDate, $lte: endDate }
+    });
+    return points.reduce((total, point) => total + point.amount, 0);
   }
 }
 

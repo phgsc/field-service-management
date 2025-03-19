@@ -1,3 +1,4 @@
+import { PerformanceDashboard } from "@/components/performance-dashboard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -5,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Visit, ServiceStatus } from "@shared/schema";
+import { Visit, ServiceStatus, Achievement, Points } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Loader2, MapPin, Play, Square, UserCircle,
@@ -98,13 +99,29 @@ export default function EngineerView() {
   const [jobId, setJobId] = useState<string>("");
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
-  const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
-  const [isResumeDialogOpen, setIsResumeDialogOpen] = useState(false);
   const { toast } = useToast();
 
+  // Query for achievements
+  const { data: achievements } = useQuery<Achievement[]>({
+    queryKey: [`/api/achievements`, user?.id],
+    enabled: !!user?.id
+  });
+
+  // Query for points
+  const { data: points } = useQuery<Points[]>({
+    queryKey: [`/api/points`, user?.id],
+    enabled: !!user?.id
+  });
+
+  // Query for weekly stats
+  const { data: weeklyStats } = useQuery({
+    queryKey: [`/api/engineers/${user?.id}/weekly-stats`],
+    enabled: !!user?.id
+  });
+
   const { data: visits } = useQuery<Visit[]>({
-    queryKey: [`/api/visits`, user?.id], // Added user ID to query key for caching and refetching
-    enabled: !!user?.id // Only run query if user is logged in
+    queryKey: [`/api/visits`, user?.id],
+    enabled: !!user?.id
   });
 
   // Location tracking interval
@@ -272,264 +289,274 @@ export default function EngineerView() {
 
   return (
     <div className="min-h-screen bg-background p-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Engineer View</CardTitle>
-          <div className="flex items-center gap-2">
-            <Dialog open={isEditProfileOpen} onOpenChange={setIsEditProfileOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <UserCircle className="mr-2 h-4 w-4" />
-                  {user?.profile?.name || user?.username}
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Edit Profile</DialogTitle>
-                </DialogHeader>
-                <ProfileEditForm onSuccess={() => setIsEditProfileOpen(false)} />
-              </DialogContent>
-            </Dialog>
+      <div className="space-y-4">
+        {/* Performance Dashboard */}
+        <PerformanceDashboard
+          user={user!}
+          achievements={achievements || []}
+          points={points || []}
+          weeklyStats={weeklyStats || null}
+        />
 
-            <Dialog open={isChangePasswordOpen} onOpenChange={setIsChangePasswordOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <Key className="h-4 w-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Change Password</DialogTitle>
-                </DialogHeader>
-                <PasswordChangeForm onSuccess={() => setIsChangePasswordOpen(false)} />
-              </DialogContent>
-            </Dialog>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Engineer View</CardTitle>
+            <div className="flex items-center gap-2">
+              <Dialog open={isEditProfileOpen} onOpenChange={setIsEditProfileOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <UserCircle className="mr-2 h-4 w-4" />
+                    {user?.profile?.name || user?.username}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Edit Profile</DialogTitle>
+                  </DialogHeader>
+                  <ProfileEditForm onSuccess={() => setIsEditProfileOpen(false)} />
+                </DialogContent>
+              </Dialog>
 
-            <Link href="/engineer-calendar">
-              <Button variant="outline" className="cursor-pointer">
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                My Schedule
+              <Dialog open={isChangePasswordOpen} onOpenChange={setIsChangePasswordOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <Key className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Change Password</DialogTitle>
+                  </DialogHeader>
+                  <PasswordChangeForm onSuccess={() => setIsChangePasswordOpen(false)} />
+                </DialogContent>
+              </Dialog>
+
+              <Link href="/engineer-calendar">
+                <Button variant="outline" className="cursor-pointer">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  My Schedule
+                </Button>
+              </Link>
+
+              <Button
+                variant="destructive"
+                onClick={() => logoutMutation.mutate()}
+                disabled={logoutMutation.isPending}
+              >
+                {logoutMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Logout
               </Button>
-            </Link>
-
-            <Button
-              variant="destructive"
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-            >
-              {logoutMutation.isPending && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              Logout
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <MapPin className="h-4 w-4" />
-              <span>
-                {location
-                  ? `${location.coords.latitude.toFixed(
-                    6,
-                  )}, ${location.coords.longitude.toFixed(6)}`
-                  : "Getting location..."}
-              </span>
             </div>
-
-            {!hasActiveVisit ? (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="jobId">Job ID</Label>
-                  <Input
-                    id="jobId"
-                    value={jobId}
-                    onChange={(e) => setJobId(e.target.value)}
-                    placeholder="Enter Job ID"
-                    required
-                  />
-                </div>
-                <Button
-                  className="w-full"
-                  onClick={() => startJourneyMutation.mutate()}
-                  disabled={startJourneyMutation.isPending || !jobId || !location}
-                >
-                  {startJourneyMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Play className="mr-2 h-4 w-4" />
-                  )}
-                  Start Journey
-                </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <MapPin className="h-4 w-4" />
+                <span>
+                  {location
+                    ? `${location.coords.latitude.toFixed(
+                      6,
+                    )}, ${location.coords.longitude.toFixed(6)}`
+                    : "Getting location..."}
+                </span>
               </div>
-            ) : activeVisit ? (
-              <Card className="bg-accent/50">
-                <CardContent className="pt-6 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <span className="font-medium">Job ID: {activeVisit.jobId}</span>
-                      <div className={`text-sm ${getStatusStyle(activeVisit.status)}`}>
-                        Status: {activeVisit.status}
-                      </div>
-                    </div>
-                    <Timer className="h-5 w-5 text-primary" />
+
+              {!hasActiveVisit ? (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="jobId">Job ID</Label>
+                    <Input
+                      id="jobId"
+                      value={jobId}
+                      onChange={(e) => setJobId(e.target.value)}
+                      placeholder="Enter Job ID"
+                      required
+                    />
                   </div>
-
-                  {activeVisit.status === ServiceStatus.ON_ROUTE && (
-                    <Button
-                      className="w-full"
-                      onClick={() => startServiceMutation.mutate(activeVisit.id)}
-                      disabled={startServiceMutation.isPending}
-                    >
-                      {startServiceMutation.isPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Play className="mr-2 h-4 w-4" />
-                      )}
-                      Start Service
-                    </Button>
-                  )}
-
-                  {activeVisit.status === ServiceStatus.IN_SERVICE && (
-                    <div className="space-y-2">
-                      <Button
-                        className="w-full"
-                        variant="default"
-                        onClick={() => completeServiceMutation.mutate(activeVisit.id)}
-                        disabled={completeServiceMutation.isPending}
-                      >
-                        {completeServiceMutation.isPending ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <CheckCircle className="mr-2 h-4 w-4" />
-                        )}
-                        Complete Service
-                      </Button>
-
-                      <Button
-                        className="w-full"
-                        variant="secondary"
-                        onClick={() =>
-                          pauseServiceMutation.mutate({
-                            visitId: activeVisit.id,
-                            reason: "next_day"
-                          })
-                        }
-                        disabled={pauseServiceMutation.isPending}
-                      >
-                        {pauseServiceMutation.isPending ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <PauseCircle className="mr-2 h-4 w-4" />
-                        )}
-                        Pause Until Tomorrow
-                      </Button>
-
-                      <Button
-                        className="w-full"
-                        variant="destructive"
-                        onClick={() =>
-                          pauseServiceMutation.mutate({
-                            visitId: activeVisit.id,
-                            reason: "blocked"
-                          })
-                        }
-                        disabled={pauseServiceMutation.isPending}
-                      >
-                        {pauseServiceMutation.isPending ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <AlertTriangle className="mr-2 h-4 w-4" />
-                        )}
-                        Mark as Blocked
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ) : null}
-
-            <div className="space-y-2">
-              <h3 className="font-semibold">Recent Visits</h3>
-              {visits?.filter(visit => visit.userId === user?.id)
-                .map((visit) => (
-                  <div
-                    key={visit.id}
-                    className="rounded border p-2 text-sm space-y-1"
+                  <Button
+                    className="w-full"
+                    onClick={() => startJourneyMutation.mutate()}
+                    disabled={startJourneyMutation.isPending || !jobId || !location}
                   >
-                    <div className="flex justify-between">
-                      <span className="font-medium">Job ID: {visit.jobId}</span>
-                      <div className={`px-2 py-0.5 rounded text-xs ${getStatusStyle(visit.status)}`}>
-                        {visit.status}
+                    {startJourneyMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Play className="mr-2 h-4 w-4" />
+                    )}
+                    Start Journey
+                  </Button>
+                </div>
+              ) : activeVisit ? (
+                <Card className="bg-accent/50">
+                  <CardContent className="pt-6 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="font-medium">Job ID: {activeVisit.jobId}</span>
+                        <div className={`text-sm ${getStatusStyle(activeVisit.status)}`}>
+                          Status: {activeVisit.status}
+                        </div>
                       </div>
+                      <Timer className="h-5 w-5 text-primary" />
                     </div>
 
-                    <div>Start: {format(new Date(visit.startTime), "PPp")}</div>
-                    {visit.endTime && (
-                      <div>End: {format(new Date(visit.endTime), "PPp")}</div>
+                    {activeVisit.status === ServiceStatus.ON_ROUTE && (
+                      <Button
+                        className="w-full"
+                        onClick={() => startServiceMutation.mutate(activeVisit.id)}
+                        disabled={startServiceMutation.isPending}
+                      >
+                        {startServiceMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Play className="mr-2 h-4 w-4" />
+                        )}
+                        Start Service
+                      </Button>
                     )}
 
-                    {visit.totalJourneyTime && (
-                      <div className="text-muted-foreground">
-                        Journey Time: {Math.round(visit.totalJourneyTime)} minutes
+                    {activeVisit.status === ServiceStatus.IN_SERVICE && (
+                      <div className="space-y-2">
+                        <Button
+                          className="w-full"
+                          variant="default"
+                          onClick={() => completeServiceMutation.mutate(activeVisit.id)}
+                          disabled={completeServiceMutation.isPending}
+                        >
+                          {completeServiceMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                          )}
+                          Complete Service
+                        </Button>
+
+                        <Button
+                          className="w-full"
+                          variant="secondary"
+                          onClick={() =>
+                            pauseServiceMutation.mutate({
+                              visitId: activeVisit.id,
+                              reason: "next_day"
+                            })
+                          }
+                          disabled={pauseServiceMutation.isPending}
+                        >
+                          {pauseServiceMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <PauseCircle className="mr-2 h-4 w-4" />
+                          )}
+                          Pause Until Tomorrow
+                        </Button>
+
+                        <Button
+                          className="w-full"
+                          variant="destructive"
+                          onClick={() =>
+                            pauseServiceMutation.mutate({
+                              visitId: activeVisit.id,
+                              reason: "blocked"
+                            })
+                          }
+                          disabled={pauseServiceMutation.isPending}
+                        >
+                          {pauseServiceMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <AlertTriangle className="mr-2 h-4 w-4" />
+                          )}
+                          Mark as Blocked
+                        </Button>
                       </div>
                     )}
+                  </CardContent>
+                </Card>
+              ) : null}
 
-                    {visit.totalServiceTime && (
-                      <div className="text-muted-foreground">
-                        Service Time: {Math.round(visit.totalServiceTime)} minutes
+              <div className="space-y-2">
+                <h3 className="font-semibold">Recent Visits</h3>
+                {visits?.filter(visit => visit.userId === user?.id)
+                  .map((visit) => (
+                    <div
+                      key={visit.id}
+                      className="rounded border p-2 text-sm space-y-1"
+                    >
+                      <div className="flex justify-between">
+                        <span className="font-medium">Job ID: {visit.jobId}</span>
+                        <div className={`px-2 py-0.5 rounded text-xs ${getStatusStyle(visit.status)}`}>
+                          {visit.status}
+                        </div>
                       </div>
-                    )}
 
-                    <div className="text-muted-foreground">
-                      Location: {visit.latitude}, {visit.longitude}
+                      <div>Start: {format(new Date(visit.startTime), "PPp")}</div>
+                      {visit.endTime && (
+                        <div>End: {format(new Date(visit.endTime), "PPp")}</div>
+                      )}
+
+                      {visit.totalJourneyTime && (
+                        <div className="text-muted-foreground">
+                          Journey Time: {Math.round(visit.totalJourneyTime)} minutes
+                        </div>
+                      )}
+
+                      {visit.totalServiceTime && (
+                        <div className="text-muted-foreground">
+                          Service Time: {Math.round(visit.totalServiceTime)} minutes
+                        </div>
+                      )}
+
+                      <div className="text-muted-foreground">
+                        Location: {visit.latitude}, {visit.longitude}
+                      </div>
+
+                      {(visit.status === ServiceStatus.PAUSED_NEXT_DAY || visit.status === ServiceStatus.BLOCKED) && (
+                        <div className="flex gap-2 mt-2">
+                          {visit.status === ServiceStatus.PAUSED_NEXT_DAY && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedVisit(visit);
+                                setIsResumeDialogOpen(true);
+                              }}
+                            >
+                              <Play className="h-4 w-4 mr-1" />
+                              Resume
+                            </Button>
+                          )}
+                          {visit.status === ServiceStatus.BLOCKED && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => unblockVisitMutation.mutate(visit.id)}
+                              disabled={unblockVisitMutation.isPending}
+                            >
+                              <Ban className="h-4 w-4 mr-1" />
+                              Unblock
+                            </Button>
+                          )}
+                        </div>
+                      )}
+
+                      {visit.status === ServiceStatus.BLOCKED && visit.blockedSince && (
+                        <div className="text-red-500">
+                          Blocked for: {
+                            Math.ceil(
+                              (new Date().getTime() - new Date(visit.blockedSince).getTime()) /
+                              (1000 * 60 * 60 * 24)
+                            )
+                          } days
+                        </div>
+                      )}
                     </div>
-
-                    {(visit.status === ServiceStatus.PAUSED_NEXT_DAY || visit.status === ServiceStatus.BLOCKED) && (
-                      <div className="flex gap-2 mt-2">
-                        {visit.status === ServiceStatus.PAUSED_NEXT_DAY && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedVisit(visit);
-                              setIsResumeDialogOpen(true);
-                            }}
-                          >
-                            <Play className="h-4 w-4 mr-1" />
-                            Resume
-                          </Button>
-                        )}
-                        {visit.status === ServiceStatus.BLOCKED && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => unblockVisitMutation.mutate(visit.id)}
-                            disabled={unblockVisitMutation.isPending}
-                          >
-                            <Ban className="h-4 w-4 mr-1" />
-                            Unblock
-                          </Button>
-                        )}
-                      </div>
-                    )}
-
-                    {visit.status === ServiceStatus.BLOCKED && visit.blockedSince && (
-                      <div className="text-red-500">
-                        Blocked for: {
-                          Math.ceil(
-                            (new Date().getTime() - new Date(visit.blockedSince).getTime()) /
-                            (1000 * 60 * 60 * 24)
-                          )
-                        } days
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  ))}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -537,4 +564,14 @@ export default function EngineerView() {
 interface UpdateProfile {
   name: string;
   designation: string;
+}
+
+interface Achievement {
+  id: string;
+  // ... other properties
+}
+
+interface Points {
+  id: string;
+  // ... other properties
 }

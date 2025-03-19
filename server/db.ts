@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { ServiceStatus } from '@shared/schema';
+import { ServiceStatus, AchievementType } from '@shared/schema';
 
 // Try to use MONGODB_URI if provided, otherwise use local MongoDB
 const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/field-service-db';
@@ -86,9 +86,42 @@ const scheduleSchema = new mongoose.Schema({
   allDay: { type: Boolean, default: false }
 });
 
+// System Settings Schema
+const systemSettingsSchema = new mongoose.Schema({
+  gamificationEnabled: { type: Boolean, default: true },
+  lastUpdated: { type: Date, required: true },
+  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
+});
+
+// Achievement Schema
+const achievementSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  type: { 
+    type: String,
+    required: true,
+    enum: Object.values(AchievementType)
+  },
+  earnedAt: { type: Date, required: true },
+  metadata: {
+    visitId: { type: mongoose.Schema.Types.ObjectId, ref: 'Visit' },
+    criteria: String,
+    value: Number
+  }
+});
+
+// Points Schema
+const pointsSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  amount: { type: Number, required: true },
+  reason: { type: String, required: true },
+  timestamp: { type: Date, required: true },
+  visitId: { type: mongoose.Schema.Types.ObjectId, ref: 'Visit' }
+});
+
 export const User = mongoose.model('User', userSchema);
 export const Location = mongoose.model('Location', locationSchema);
 export const Visit = mongoose.model('Visit', visitSchema);
-
-// Add after the existing exports
 export const Schedule = mongoose.model('Schedule', scheduleSchema);
+export const SystemSettings = mongoose.model('SystemSettings', systemSettingsSchema);
+export const Achievement = mongoose.model('Achievement', achievementSchema);
+export const Points = mongoose.model('Points', pointsSchema);
