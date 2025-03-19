@@ -10,6 +10,7 @@ import AdminUsersPage from "@/pages/admin-users";
 import EngineerView from "@/pages/engineer-view";
 import AdminCalendar from "@/pages/admin-calendar";
 import EngineerCalendar from "@/pages/engineer-calendar";
+import AdminSettings from "@/pages/admin-settings";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import MapView from "@/pages/map-view";
@@ -25,6 +26,7 @@ function Router() {
       <ProtectedRoute path="/map/:engineerId" component={MapView} />
       <ProtectedRoute path="/admin-calendar" component={AdminCalendar} />
       <ProtectedRoute path="/engineer-calendar" component={EngineerCalendar} />
+      <ProtectedRoute path="/admin-settings" component={AdminSettings} />
       <Route component={NotFound} />
     </Switch>
   );
