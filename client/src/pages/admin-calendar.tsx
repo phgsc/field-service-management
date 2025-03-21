@@ -283,7 +283,7 @@ export default function AdminCalendarView() {
                     engineerId={engineer.id}
                     events={engineerSchedules[engineer.id] || []}
                     isAdmin={true}
-                    initialDate={engineerSchedules[engineer.id]?.length 
+                    initialDate={engineerSchedules[engineer.id]?.length
                       ? new Date(Math.min(...engineerSchedules[engineer.id].map(e => new Date(e.start).getTime())))
                       : new Date()}
                   />
