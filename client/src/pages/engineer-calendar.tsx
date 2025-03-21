@@ -1,13 +1,11 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Loader2, LogOut, Download } from "lucide-react";
-import {
-  ScheduleCalendar,
-  TASK_TYPES,
-  TaskType,
-} from "@/components/schedule-calendar";
+import { ScheduleCalendar, TASK_TYPES, TaskType } from "@/components/schedule-calendar";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import * as ExcelJS from 'exceljs';
+import { format, startOfDay, endOfDay } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -213,6 +211,95 @@ export default function EngineerCalendarView() {
     setSelectedDates(null);
   };
 
+  const downloadReport = async () => {
+    try {
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+
+      // Create a new workbook
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Field Service Management';
+      workbook.created = new Date();
+
+      // Create worksheet
+      const worksheet = workbook.addWorksheet('My Schedule');
+
+      // Add header with styling
+      worksheet.mergeCells('A1:E1');
+      const titleRow = worksheet.getRow(1);
+      titleRow.getCell(1).value = 'Engineer Schedule Report';
+      titleRow.font = { bold: true, size: 14 };
+
+      // Add engineer info
+      worksheet.mergeCells('A2:E2');
+      worksheet.getCell('A2').value = `Name: ${user.profile?.name || user.username}`;
+
+      // Add date range
+      const dateRange = `Report generated on: ${format(new Date(), "PPP")}`;
+      worksheet.mergeCells('A3:E3');
+      worksheet.getCell('A3').value = dateRange;
+
+      // Add headers
+      worksheet.getRow(5).values = ['Date', 'Time', 'Title', 'Type', 'Duration (hours)'];
+      worksheet.getRow(5).font = { bold: true };
+
+      // Add data
+      let rowIndex = 6;
+      if (events && events.length > 0) {
+        events.forEach(event => {
+          const start = new Date(event.start);
+          const end = new Date(event.end);
+          const duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+
+          worksheet.getRow(rowIndex).values = [
+            format(start, "yyyy-MM-dd"),
+            format(start, "HH:mm"),
+            event.title,
+            event.type,
+            Number(duration.toFixed(2))
+          ];
+          rowIndex++;
+        });
+      } else {
+        worksheet.getCell('A6').value = 'No events found';
+      }
+
+      // Set column widths
+      worksheet.columns = [
+        { width: 12 }, // Date
+        { width: 8 },  // Time
+        { width: 30 }, // Title
+        { width: 15 }, // Type
+        { width: 15 }  // Duration
+      ];
+
+      // Generate blob and download
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `schedule-report-${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Report downloaded",
+        description: "Your schedule report has been downloaded successfully",
+      });
+    } catch (error) {
+      console.error("Report generation error:", error);
+      toast({
+        title: "Failed to generate report",
+        description: error instanceof Error ? error.message : "An error occurred while generating the report",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (isLoadingSchedules || isLoadingVisits || !user) {
     return (
       <div className="min-h-screen bg-background p-4 flex items-center justify-center">
@@ -228,10 +315,7 @@ export default function EngineerCalendarView() {
           <h1 className="text-2xl font-bold">My Schedule</h1>
           <div className="flex items-center gap-2">
             <Button
-              onClick={() => toast({
-                title: "Coming Soon",
-                description: "The report download feature will be available soon",
-              })}
+              onClick={downloadReport}
               variant="outline"
               className="flex items-center gap-2"
             >

@@ -3,7 +3,7 @@ import { useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Location, User } from "@shared/schema";
 import { format } from "date-fns";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from 'leaflet';
 import { useEffect, useState } from "react";
@@ -16,6 +16,15 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
+
+// Add RecenterAutomatically component to handle map updates
+function RecenterAutomatically({ lat, lng }: { lat: number; lng: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView([lat, lng], map.getZoom());
+  }, [lat, lng]);
+  return null;
+}
 
 export default function MapView() {
   const { engineerId } = useParams();
@@ -34,17 +43,6 @@ export default function MapView() {
 
   const lastLocation = locations?.[locations.length - 1];
 
-  // Center map on last known position
-  useEffect(() => {
-    if (mapRef && lastLocation) {
-      const center: [number, number] = [
-        parseFloat(lastLocation.latitude),
-        parseFloat(lastLocation.longitude)
-      ];
-      mapRef.setView(center, mapRef.getZoom());
-    }
-  }, [mapRef, lastLocation]);
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background p-4 flex items-center justify-center">
@@ -53,6 +51,7 @@ export default function MapView() {
     );
   }
 
+  // Set initial center - use last known location or default to London
   const center = lastLocation 
     ? [parseFloat(lastLocation.latitude), parseFloat(lastLocation.longitude)]
     : [51.5074, -0.1278]; // Default to London if no location
@@ -78,6 +77,12 @@ export default function MapView() {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 />
+                {lastLocation && (
+                  <RecenterAutomatically 
+                    lat={parseFloat(lastLocation.latitude)} 
+                    lng={parseFloat(lastLocation.longitude)} 
+                  />
+                )}
                 {locations?.map((loc) => {
                   const position: [number, number] = [
                     parseFloat(loc.latitude),
