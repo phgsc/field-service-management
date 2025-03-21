@@ -12,7 +12,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { DateRangePicker } from "@/components/date-range-picker";
 import { useRef, useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
@@ -43,6 +52,11 @@ export default function EngineerCalendarView() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+  const [selectedDates, setSelectedDates] = useState<{
+    start: Date;
+    end: Date;
+    allDay: boolean;
+  } | null>(null);
   const [reportDateRange, setReportDateRange] = useState<{
     from: Date | undefined;
     to: Date | undefined;
@@ -218,48 +232,35 @@ export default function EngineerCalendarView() {
     }
 
     try {
-      if (!user) {
-        throw new Error("User not authenticated");
-      }
-
-      // Set date range boundaries for consistent filtering
       const rangeStart = startOfDay(reportDateRange.from);
       const rangeEnd = endOfDay(reportDateRange.to);
 
-      // Create a new workbook
       const workbook = new ExcelJS.Workbook();
       workbook.creator = 'Field Service Management';
       workbook.created = new Date();
 
-      // Create worksheet
       const worksheet = workbook.addWorksheet('My Schedule');
 
-      // Add header with styling
       worksheet.mergeCells('A1:E1');
       const titleRow = worksheet.getRow(1);
       titleRow.getCell(1).value = 'Engineer Schedule Report';
       titleRow.font = { bold: true, size: 14 };
 
-      // Add engineer info
       worksheet.mergeCells('A2:E2');
-      worksheet.getCell('A2').value = `Name: ${user.profile?.name || user.username}`;
-
-      // Add date range info
+      worksheet.getCell('A2').value = `Name: ${user?.profile?.name || user?.username}`;
       worksheet.mergeCells('A3:E3');
       worksheet.getCell('A3').value = `Date Range: ${format(rangeStart, "PPP")} to ${format(rangeEnd, "PPP")}`;
 
-      // Add headers
       worksheet.getRow(5).values = ['Date', 'Time', 'Title', 'Type', 'Duration (hours)'];
       worksheet.getRow(5).font = { bold: true };
 
-      // Filter and add data
       const filteredEvents = events.filter(event => {
         const eventDate = new Date(event.start);
         return eventDate >= rangeStart && eventDate <= rangeEnd;
       });
 
-      let rowIndex = 6;
       if (filteredEvents.length > 0) {
+        let rowIndex = 6;
         filteredEvents.forEach(event => {
           const start = new Date(event.start);
           const end = new Date(event.end);
@@ -278,7 +279,6 @@ export default function EngineerCalendarView() {
         worksheet.getCell('A6').value = 'No events found in selected date range';
       }
 
-      // Set column widths
       worksheet.columns = [
         { width: 12 }, // Date
         { width: 8 },  // Time
@@ -287,7 +287,6 @@ export default function EngineerCalendarView() {
         { width: 15 }  // Duration
       ];
 
-      // Generate blob and download
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = window.URL.createObjectURL(blob);
@@ -347,6 +346,7 @@ export default function EngineerCalendarView() {
             </Button>
           </div>
         </div>
+
         <div className="grid grid-cols-1 gap-4">
           <ScheduleCalendar
             engineerId={user.id}
@@ -438,7 +438,7 @@ export default function EngineerCalendarView() {
                         />
                         {title}
                       </SelectItem>
-                    ),
+                    )
                   )}
                 </SelectContent>
               </Select>
@@ -452,11 +452,8 @@ export default function EngineerCalendarView() {
             <Button
               type="submit"
               className="w-full"
-              disabled={addScheduleMutation.isPending}
+              disabled={false}
             >
-              {addScheduleMutation.isPending && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
               Add Task
             </Button>
           </form>
