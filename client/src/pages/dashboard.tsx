@@ -14,12 +14,13 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AdminNav } from "@/components/admin-nav"; // Added import
 
 
-// Add CreateEngineerForm component
+// CreateEngineerForm component update
 function CreateEngineerForm({ onSuccess }: { onSuccess: () => void }) {
   const form = useForm({
     defaultValues: { 
       username: "", 
       password: "",
+      email: "",  // Added email field
       name: "",
       designation: ""
     }
@@ -29,6 +30,7 @@ function CreateEngineerForm({ onSuccess }: { onSuccess: () => void }) {
     mutationFn: async (data: { 
       username: string; 
       password: string;
+      email: string;   // Added email to type
       name: string;
       designation: string;
     }) => {
@@ -50,6 +52,15 @@ function CreateEngineerForm({ onSuccess }: { onSuccess: () => void }) {
       <div className="space-y-2">
         <Label htmlFor="username">Username</Label>
         <Input id="username" {...form.register("username")} required />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <Input 
+          id="email" 
+          type="email" 
+          {...form.register("email")} 
+          required 
+        />
       </div>
       <div className="space-y-2">
         <Label htmlFor="password">Password</Label>
