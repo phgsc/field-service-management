@@ -228,7 +228,10 @@ export default function EngineerCalendarView() {
           <h1 className="text-2xl font-bold">My Schedule</h1>
           <div className="flex items-center gap-2">
             <Button
-              onClick={() => setIsDialogOpen(true)}
+              onClick={() => toast({
+                title: "Coming Soon",
+                description: "The report download feature will be available soon",
+              })}
               variant="outline"
               className="flex items-center gap-2"
             >
