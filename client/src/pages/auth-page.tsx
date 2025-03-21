@@ -7,18 +7,58 @@ import { useAuth } from "@/hooks/use-auth";
 import { useForm } from "react-hook-form";
 import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useState, useEffect } from "react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
   const { user, loginMutation, registerMutation } = useAuth();
+  const { toast } = useToast();
+  const [showEmailPrompt, setShowEmailPrompt] = useState(false);
 
   const loginForm = useForm({
-    defaultValues: { username: "", password: "" },
+    defaultValues: { usernameOrEmail: "", password: "" },
   });
 
   const registerForm = useForm({
-    defaultValues: { username: "", password: "", isAdmin: false },
+    defaultValues: { username: "", email: "", password: "", isAdmin: false },
   });
+
+  const emailUpdateForm = useForm({
+    defaultValues: { email: "" },
+  });
+
+  const updateEmailMutation = useMutation({
+    mutationFn: async (data: { email: string }) => {
+      const res = await apiRequest("POST", "/api/update-email", data);
+      return res.json();
+    },
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(["/api/user"], updatedUser);
+      setShowEmailPrompt(false);
+      toast({
+        title: "Email Updated",
+        description: "Your email has been updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Check if we need to show email prompt after login
+  useEffect(() => {
+    if (user && !user.email) {
+      setShowEmailPrompt(true);
+    }
+  }, [user]);
 
   if (user) {
     setLocation(user.isAdmin ? "/" : "/engineer");
@@ -46,10 +86,10 @@ export default function AuthPage() {
                 className="space-y-4"
               >
                 <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
+                  <Label htmlFor="usernameOrEmail">Username or Email</Label>
                   <Input
-                    id="username"
-                    {...loginForm.register("username")}
+                    id="usernameOrEmail"
+                    {...loginForm.register("usernameOrEmail")}
                     required
                   />
                 </div>
@@ -91,6 +131,14 @@ export default function AuthPage() {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="reg-email">Email</Label>
+                  <Input
+                    id="reg-email"
+                    type="email"
+                    {...registerForm.register("email")}
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="reg-password">Password</Label>
                   <Input
                     id="reg-password"
@@ -122,6 +170,40 @@ export default function AuthPage() {
           </Tabs>
         </CardContent>
       </Card>
+
+      <Dialog open={showEmailPrompt} onOpenChange={setShowEmailPrompt}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Your Email Address</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={emailUpdateForm.handleSubmit((data) =>
+              updateEmailMutation.mutate(data)
+            )}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address</Label>
+              <Input
+                id="email"
+                type="email"
+                {...emailUpdateForm.register("email")}
+                required
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={updateEmailMutation.isPending}
+            >
+              {updateEmailMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Update Email
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
