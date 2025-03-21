@@ -12,17 +12,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useState, useMemo } from "react";
+import { DateRangePicker } from "@/components/date-range-picker";
+import { useRef, useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -50,11 +42,15 @@ export default function EngineerCalendarView() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedDates, setSelectedDates] = useState<{
-    start: Date;
-    end: Date;
-    allDay: boolean;
-  } | null>(null);
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+  const [reportDateRange, setReportDateRange] = useState<{
+    from: Date | undefined;
+    to: Date | undefined;
+  }>({
+    from: undefined,
+    to: undefined,
+  });
+  const downloadButtonRef = useRef<HTMLButtonElement>(null);
 
   const form = useForm<TaskFormData>({
     resolver: zodResolver(taskSchema),
@@ -212,10 +208,23 @@ export default function EngineerCalendarView() {
   };
 
   const downloadReport = async () => {
+    if (!reportDateRange.from || !reportDateRange.to) {
+      toast({
+        title: "Date range required",
+        description: "Please select both start and end dates for the report",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       if (!user) {
         throw new Error("User not authenticated");
       }
+
+      // Set date range boundaries for consistent filtering
+      const rangeStart = startOfDay(reportDateRange.from);
+      const rangeEnd = endOfDay(reportDateRange.to);
 
       // Create a new workbook
       const workbook = new ExcelJS.Workbook();
@@ -235,19 +244,23 @@ export default function EngineerCalendarView() {
       worksheet.mergeCells('A2:E2');
       worksheet.getCell('A2').value = `Name: ${user.profile?.name || user.username}`;
 
-      // Add date range
-      const dateRange = `Report generated on: ${format(new Date(), "PPP")}`;
+      // Add date range info
       worksheet.mergeCells('A3:E3');
-      worksheet.getCell('A3').value = dateRange;
+      worksheet.getCell('A3').value = `Date Range: ${format(rangeStart, "PPP")} to ${format(rangeEnd, "PPP")}`;
 
       // Add headers
       worksheet.getRow(5).values = ['Date', 'Time', 'Title', 'Type', 'Duration (hours)'];
       worksheet.getRow(5).font = { bold: true };
 
-      // Add data
+      // Filter and add data
+      const filteredEvents = events.filter(event => {
+        const eventDate = new Date(event.start);
+        return eventDate >= rangeStart && eventDate <= rangeEnd;
+      });
+
       let rowIndex = 6;
-      if (events && events.length > 0) {
-        events.forEach(event => {
+      if (filteredEvents.length > 0) {
+        filteredEvents.forEach(event => {
           const start = new Date(event.start);
           const end = new Date(event.end);
           const duration = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
@@ -262,7 +275,7 @@ export default function EngineerCalendarView() {
           rowIndex++;
         });
       } else {
-        worksheet.getCell('A6').value = 'No events found';
+        worksheet.getCell('A6').value = 'No events found in selected date range';
       }
 
       // Set column widths
@@ -280,12 +293,14 @@ export default function EngineerCalendarView() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `schedule-report-${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+      a.download = `schedule-report-${format(rangeStart, "yyyy-MM-dd")}-to-${format(rangeEnd, "yyyy-MM-dd")}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
+      setIsReportDialogOpen(false);
+      setReportDateRange({ from: undefined, to: undefined });
       toast({
         title: "Report downloaded",
         description: "Your schedule report has been downloaded successfully",
@@ -315,7 +330,7 @@ export default function EngineerCalendarView() {
           <h1 className="text-2xl font-bold">My Schedule</h1>
           <div className="flex items-center gap-2">
             <Button
-              onClick={downloadReport}
+              onClick={() => setIsReportDialogOpen(true)}
               variant="outline"
               className="flex items-center gap-2"
             >
@@ -346,6 +361,28 @@ export default function EngineerCalendarView() {
           />
         </div>
       </div>
+
+      <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Download Calendar Report</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <DateRangePicker
+              dateRange={reportDateRange}
+              onDateRangeChange={setReportDateRange}
+            />
+            <Button
+              ref={downloadButtonRef}
+              onClick={downloadReport}
+              className="w-full"
+              disabled={!reportDateRange.from || !reportDateRange.to}
+            >
+              Download Report
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
         <DialogContent>
