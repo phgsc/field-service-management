@@ -75,10 +75,13 @@ export function setupAuth(app: Express) {
   app.use(passport.session());
 
   passport.use(
-    new LocalStrategy(async (username, password, done) => {
+    new LocalStrategy({
+      usernameField: 'usernameOrEmail',
+      passwordField: 'password'
+    }, async (usernameOrEmail, password, done) => {
       try {
         // Try to find user by username or email
-        const user = await storage.getUserByUsernameOrEmail(username);
+        const user = await storage.getUserByUsernameOrEmail(usernameOrEmail);
         if (!user || !(await comparePasswords(password, user.password))) {
           return done(null, false);
         }
