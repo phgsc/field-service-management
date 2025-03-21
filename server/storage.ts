@@ -27,6 +27,9 @@ export interface IStorage {
   getPoints(userId: string): Promise<Points[]>;
   getVisitsByDateRange(userId: string, startDate: Date, endDate: Date): Promise<Visit[]>;
   getWeeklyPoints(userId: string, startDate: Date, endDate: Date): Promise<number>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByUsernameOrEmail(usernameOrEmail: string): Promise<User | undefined>;
+  updateUserEmail(id: string, email: string): Promise<User | undefined>;
 }
 
 // Helper function to convert MongoDB document to our interface type
@@ -201,6 +204,35 @@ export class MongoStorage implements IStorage {
       timestamp: { $gte: startDate, $lte: endDate }
     });
     return points.reduce((total, point) => total + point.amount, 0);
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const user = await UserModel.findOne({ email });
+    return user ? convertDocument<User>(user) : undefined;
+  }
+
+  async getUserByUsernameOrEmail(usernameOrEmail: string): Promise<User | undefined> {
+    const user = await UserModel.findOne({
+      $or: [
+        { username: usernameOrEmail },
+        { email: usernameOrEmail }
+      ]
+    });
+    return user ? convertDocument<User>(user) : undefined;
+  }
+
+  async updateUserEmail(id: string, email: string): Promise<User | undefined> {
+    const user = await UserModel.findByIdAndUpdate(
+      id,
+      { 
+        $set: { 
+          email,
+          'profile.emailVerified': true 
+        }
+      },
+      { new: true }
+    );
+    return user ? convertDocument<User>(user) : undefined;
   }
 }
 

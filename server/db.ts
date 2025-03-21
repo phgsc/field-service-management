@@ -25,12 +25,14 @@ db.on('error', (error) => {
 // User Schema with extended profile information
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
+  email: { type: String, sparse: true, unique: true }, // Allow null but must be unique if present
   password: { type: String, required: true },
   isAdmin: { type: Boolean, default: false },
   profile: {
     name: { type: String },
     designation: { type: String },
-    lastPasswordReset: { type: Date }
+    lastPasswordReset: { type: Date },
+    emailVerified: { type: Boolean, default: false }
   }
 });
 
