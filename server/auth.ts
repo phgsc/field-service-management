@@ -82,10 +82,42 @@ export async function sendWelcomeEmail(email: string, username: string) {
   }
 }
 
+// Add whitelist for IP addresses that can access the hash endpoint
+const ALLOWED_IPS = ['127.0.0.1', 'localhost', '::1'];
+
+// Export hashPassword so it can be used directly
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
+}
+
+// Add the new hash endpoint
+export function setupHashEndpoint(app: Express) {
+  app.get("/api/hash/:string", (req, res) => {
+    const clientIp = req.ip;
+
+    // Check if the request is from an allowed IP
+    if (!ALLOWED_IPS.includes(clientIp)) {
+      console.warn(`Unauthorized hash attempt from IP: ${clientIp}`);
+      return res.status(403).send("Access denied");
+    }
+
+    const stringToHash = req.params.string;
+
+    if (!stringToHash) {
+      return res.status(400).send("String parameter is required");
+    }
+
+    hashPassword(stringToHash)
+      .then(hashedString => {
+        res.status(200).json({ hash: hashedString });
+      })
+      .catch(error => {
+        console.error('Error hashing string:', error);
+        res.status(500).send("Error generating hash");
+      });
+  });
 }
 
 async function comparePasswords(supplied: string, stored: string) {
@@ -219,4 +251,5 @@ export function setupAuth(app: Express) {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     res.json(req.user);
   });
+  setupHashEndpoint(app);
 }
