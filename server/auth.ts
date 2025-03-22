@@ -18,19 +18,48 @@ const scryptAsync = promisify(scrypt);
 
 // Email configuration
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
+  host: process.env.SMTP_HOST?.trim() || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT?.trim() || '587'),
   secure: process.env.SMTP_SECURE === 'true',
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
+    user: process.env.SMTP_USER?.trim(),
+    pass: process.env.SMTP_PASS?.trim()
   }
 });
 
+// Test SMTP connection
+async function verifyEmailConfig() {
+  try {
+    console.log('Verifying SMTP connection...');
+    await transporter.verify();
+    console.log('SMTP connection verified successfully');
+    return true;
+  } catch (error) {
+    console.error('SMTP connection failed:', error);
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        config: {
+          host: process.env.SMTP_HOST,
+          port: process.env.SMTP_PORT,
+          secure: process.env.SMTP_SECURE === 'true',
+          user: process.env.SMTP_USER ? '(set)' : '(not set)',
+          from: process.env.SMTP_FROM
+        }
+      });
+    }
+    return false;
+  }
+}
+
+// Add detailed logging for email sending
 export async function sendWelcomeEmail(email: string, username: string) {
   try {
+    console.log(`Attempting to send welcome email to ${email} for user ${username}`);
+
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"Field Service App" <no-reply@fieldservice.app>',
+      from: process.env.SMTP_FROM?.trim() || '"Field Service App" <no-reply@fieldservice.app>',
       to: email,
       subject: "Welcome to Field Service Management",
       html: `
@@ -40,8 +69,16 @@ export async function sendWelcomeEmail(email: string, username: string) {
         <p>If you have any questions, please contact your administrator.</p>
       `
     });
+    console.log('Welcome email sent successfully');
   } catch (error) {
     console.error('Failed to send welcome email:', error);
+    // Log the full error details for debugging
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
+    }
   }
 }
 
@@ -62,6 +99,13 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express) {
+  // Verify email configuration on startup
+  verifyEmailConfig().then(isValid => {
+    if (!isValid) {
+      console.warn('Email functionality may not work due to invalid SMTP configuration');
+    }
+  });
+
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET!,
     resave: false,

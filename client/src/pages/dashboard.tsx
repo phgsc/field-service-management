@@ -11,8 +11,55 @@ import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { AdminNav } from "@/components/admin-nav"; // Added import
+import { AdminNav } from "@/components/admin-nav";
 
+// ViewProfileDialog component update to include email
+function ViewProfileDialog({ 
+  engineer, 
+  onClose 
+}: { 
+  engineer: User; 
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Engineer Profile</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Username</Label>
+            <p className="text-sm text-muted-foreground">{engineer.username}</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Email</Label>
+            <p className="text-sm text-muted-foreground">{engineer.email || "Not set"}</p>
+            {engineer.profile?.emailVerified && (
+              <span className="text-xs text-green-500">(Verified)</span>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label>Full Name</Label>
+            <p className="text-sm text-muted-foreground">{engineer.profile?.name || "Not set"}</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Designation</Label>
+            <p className="text-sm text-muted-foreground">{engineer.profile?.designation || "Not set"}</p>
+          </div>
+          {engineer.profile?.lastPasswordReset && (
+            <div className="space-y-2">
+              <Label>Last Password Reset</Label>
+              <p className="text-sm text-muted-foreground">
+                {format(new Date(engineer.profile.lastPasswordReset), "PPp")}
+              </p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // CreateEngineerForm component update
 function CreateEngineerForm({ onSuccess }: { onSuccess: () => void }) {
@@ -163,47 +210,6 @@ function ResetPasswordForm({
   );
 }
 
-// Add ViewProfileDialog component
-function ViewProfileDialog({ 
-  engineer, 
-  onClose 
-}: { 
-  engineer: User; 
-  onClose: () => void;
-}) {
-  return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Engineer Profile</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Username</Label>
-            <p className="text-sm text-muted-foreground">{engineer.username}</p>
-          </div>
-          <div className="space-y-2">
-            <Label>Full Name</Label>
-            <p className="text-sm text-muted-foreground">{engineer.profile?.name || "Not set"}</p>
-          </div>
-          <div className="space-y-2">
-            <Label>Designation</Label>
-            <p className="text-sm text-muted-foreground">{engineer.profile?.designation || "Not set"}</p>
-          </div>
-          {engineer.profile?.lastPasswordReset && (
-            <div className="space-y-2">
-              <Label>Last Password Reset</Label>
-              <p className="text-sm text-muted-foreground">
-                {format(new Date(engineer.profile.lastPasswordReset), "PPp")}
-              </p>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -345,7 +351,6 @@ export default function Dashboard() {
                               variant="outline"
                               size="sm"
                               onClick={() => setSelectedEngineer(engineer)}
-                              // Allow admin-to-admin password resets
                               disabled={engineer.id === user?.id}
                             >
                               <Key className="h-4 w-4" />

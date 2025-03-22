@@ -53,13 +53,59 @@ export default function AuthPage() {
     },
   });
 
-  // Check if we need to show email prompt after login
+  // Handle email prompt visibility
   useEffect(() => {
     if (user && !user.email) {
       setShowEmailPrompt(true);
     }
   }, [user]);
 
+  // First check if user needs email update
+  if (user && !user.email && showEmailPrompt) {
+    return (
+      <Dialog open={true} onOpenChange={() => {}}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Your Email Address</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Please add your email address to complete your profile setup.
+            </p>
+            <form
+              onSubmit={emailUpdateForm.handleSubmit((data) =>
+                updateEmailMutation.mutate(data)
+              )}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  {...emailUpdateForm.register("email")}
+                  required
+                  autoFocus
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={updateEmailMutation.isPending}
+              >
+                {updateEmailMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Update Email
+              </Button>
+            </form>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Then check for redirection
   if (user) {
     setLocation(user.isAdmin ? "/" : "/engineer");
     return null;
@@ -170,40 +216,6 @@ export default function AuthPage() {
           </Tabs>
         </CardContent>
       </Card>
-
-      <Dialog open={showEmailPrompt} onOpenChange={setShowEmailPrompt}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Your Email Address</DialogTitle>
-          </DialogHeader>
-          <form
-            onSubmit={emailUpdateForm.handleSubmit((data) =>
-              updateEmailMutation.mutate(data)
-            )}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
-              <Input
-                id="email"
-                type="email"
-                {...emailUpdateForm.register("email")}
-                required
-              />
-            </div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={updateEmailMutation.isPending}
-            >
-              {updateEmailMutation.isPending && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              Update Email
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
