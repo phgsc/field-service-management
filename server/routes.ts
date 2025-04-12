@@ -493,11 +493,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { latitude, longitude } = req.body;
       
-      // Input validation
-      if (!latitude || !longitude) {
-        return res.status(400).send("Latitude and longitude are required");
-      }
-      
       // Get original visit
       const visit = await storage.getVisit(req.params.id);
       if (!visit) return res.status(404).send("Visit not found");
@@ -525,13 +520,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : `${req.user.profile?.name || req.user.username} joined at ${new Date().toLocaleString()}`
       });
       
-      // Record location for the collaborator too
-      await storage.createLocation({
-        userId: req.user.id,
-        latitude,
-        longitude,
-        timestamp: new Date()
-      });
+      // Record location for the collaborator if available
+      if (latitude && longitude) {
+        await storage.createLocation({
+          userId: req.user.id,
+          latitude,
+          longitude,
+          timestamp: new Date()
+        });
+      }
       
       res.json(updatedVisit);
     } catch (err) {

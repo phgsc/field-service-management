@@ -206,12 +206,17 @@ export default function EngineerView() {
 
   const startJourneyMutation = useMutation({
     mutationFn: async () => {
-      if (!location || !jobId) throw new Error("Location and Job ID are required");
-      const res = await apiRequest("POST", "/api/visits/start-journey", {
-        jobId,
-        latitude: location.coords.latitude.toString(),
-        longitude: location.coords.longitude.toString(),
-      });
+      if (!jobId) throw new Error("Job ID is required");
+      
+      const payload: any = { jobId };
+      
+      // Add location data if available
+      if (location) {
+        payload.latitude = location.coords.latitude.toString();
+        payload.longitude = location.coords.longitude.toString();
+      }
+      
+      const res = await apiRequest("POST", "/api/visits/start-journey", payload);
       return await res.json();
     },
     onSuccess: () => {
@@ -263,11 +268,15 @@ export default function EngineerView() {
   // Add join job mutation
   const joinJobMutation = useMutation({
     mutationFn: async (visitId: string) => {
-      if (!location) throw new Error("Location is required to join a job");
-      const res = await apiRequest("POST", `/api/visits/${visitId}/join`, {
-        latitude: location.coords.latitude.toString(),
-        longitude: location.coords.longitude.toString(),
-      });
+      const payload: any = {};
+      
+      // Add location data if available
+      if (location) {
+        payload.latitude = location.coords.latitude.toString();
+        payload.longitude = location.coords.longitude.toString();
+      }
+      
+      const res = await apiRequest("POST", `/api/visits/${visitId}/join`, payload);
       return res.json();
     },
     onSuccess: () => {
@@ -480,7 +489,7 @@ export default function EngineerView() {
                   <Button
                     className="w-full"
                     onClick={() => startJourneyMutation.mutate()}
-                    disabled={startJourneyMutation.isPending || !jobId || !location}
+                    disabled={startJourneyMutation.isPending || !jobId}
                   >
                     {startJourneyMutation.isPending ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
