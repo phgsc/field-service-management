@@ -66,7 +66,9 @@ const visitSchema = new mongoose.Schema({
   blockReason: String,
   blockedSince: { type: Date },
   totalServiceTime: { type: Number }, // in minutes
-  totalJourneyTime: { type: Number }  // in minutes
+  totalJourneyTime: { type: Number },  // in minutes
+  collaborators: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Array of engineers who joined
+  collaborationNotes: String // Notes about the collaboration
 });
 
 // Add after the existing schemas

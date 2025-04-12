@@ -63,6 +63,8 @@ export const insertVisitSchema = z.object({
   blockedSince: z.date().optional(),
   totalServiceTime: z.number().optional(), // in minutes
   totalJourneyTime: z.number().optional(), // in minutes
+  collaborators: z.array(z.string()).optional(), // Array of engineer IDs who joined this visit
+  collaborationNotes: z.string().optional(), // Notes about the collaboration
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -110,6 +112,8 @@ export interface Visit {
   blockedSince?: Date;
   totalServiceTime?: number;
   totalJourneyTime?: number;
+  collaborators?: string[]; // Array of engineer IDs who joined this visit
+  collaborationNotes?: string; // Notes about the collaboration
 }
 
 export const insertScheduleSchema = z.object({
