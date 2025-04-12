@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Visit, ServiceStatus, Achievement, Points } from "@shared/schema";
+import { Visit, ServiceStatus, type Achievement, type Points } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Loader2, MapPin, Play, Square, UserCircle,
@@ -259,6 +259,30 @@ export default function EngineerView() {
       toast({ title: "Service paused" });
     },
   });
+  
+  // Add join job mutation
+  const joinJobMutation = useMutation({
+    mutationFn: async (visitId: string) => {
+      if (!location) throw new Error("Location is required to join a job");
+      const res = await apiRequest("POST", `/api/visits/${visitId}/join`, {
+        latitude: location.coords.latitude.toString(),
+        longitude: location.coords.longitude.toString(),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visits", user?.id] });
+      setIsJoinJobDialogOpen(false);
+      toast({ title: "Successfully joined the job" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to join job",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
 
   // Helper function to get status-based style
   const getStatusStyle = (status: string) => {
@@ -289,12 +313,83 @@ export default function EngineerView() {
     [ServiceStatus.ON_ROUTE, ServiceStatus.IN_SERVICE].includes(v.status as keyof typeof ServiceStatus) &&
     v.userId === user?.id
   );
+  
+  // Get all active jobs that the engineer can join
+  const activeJobs = visits?.filter(v => 
+    [ServiceStatus.ON_ROUTE, ServiceStatus.IN_SERVICE].includes(v.status as keyof typeof ServiceStatus) &&
+    v.userId !== user?.id &&
+    !(v.collaborators?.includes(user?.id || ''))
+  ) || [];
+
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [isResumeDialogOpen, setIsResumeDialogOpen] = useState(false);
+  const [isJoinJobDialogOpen, setIsJoinJobDialogOpen] = useState(false);
+
+  // Add Join Job Dialog
+  const renderJoinJobDialog = () => {
+    return (
+      <Dialog open={isJoinJobDialogOpen} onOpenChange={setIsJoinJobDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Join Existing Job</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Select an active job to join as a collaborator
+            </p>
+            {activeJobs.length === 0 ? (
+              <p>No active jobs available to join.</p>
+            ) : (
+              <div className="space-y-4">
+                {activeJobs.map(job => {
+                  // Find the engineer who owns this job
+                  const engineer = job.userId;
+                  
+                  return (
+                    <Card key={job.id} className="p-4">
+                      <div className="flex flex-col space-y-2">
+                        <div className="flex justify-between">
+                          <span className="font-medium">Job ID: {job.jobId}</span>
+                          <div className={`px-2 py-0.5 rounded text-xs ${getStatusStyle(job.status)}`}>
+                            {job.status}
+                          </div>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Engineer ID: {engineer}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Location: {job.latitude}, {job.longitude}
+                        </div>
+                        <Button 
+                          className="w-full mt-2"
+                          onClick={() => joinJobMutation.mutate(job.id)}
+                          disabled={joinJobMutation.isPending}
+                        >
+                          {joinJobMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Truck className="mr-2 h-4 w-4" />
+                          )}
+                          Join This Job
+                        </Button>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="space-y-4">
+        {/* Join Job Dialog */}
+        {renderJoinJobDialog()}
+        
         {/* Performance Dashboard */}
         {settings?.gamificationEnabled && (
           <PerformanceDashboard
@@ -394,6 +489,17 @@ export default function EngineerView() {
                     )}
                     Start Journey
                   </Button>
+                  
+                  {activeJobs.length > 0 && (
+                    <Button
+                      className="w-full"
+                      variant="secondary"
+                      onClick={() => setIsJoinJobDialogOpen(true)}
+                    >
+                      <Truck className="mr-2 h-4 w-4" />
+                      Join Existing Job
+                    </Button>
+                  )}
                 </div>
               ) : activeVisit ? (
                 <Card className="bg-accent/50">
@@ -571,14 +677,4 @@ export default function EngineerView() {
 interface UpdateProfile {
   name: string;
   designation: string;
-}
-
-interface Achievement {
-  id: string;
-  // ... other properties
-}
-
-interface Points {
-  id: string;
-  // ... other properties
 }
