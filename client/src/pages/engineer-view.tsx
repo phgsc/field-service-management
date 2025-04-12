@@ -492,12 +492,12 @@ export default function EngineerView() {
                   
                   {activeJobs.length > 0 && (
                     <Button
-                      className="w-full"
+                      className="w-full mt-2"
                       variant="secondary"
                       onClick={() => setIsJoinJobDialogOpen(true)}
                     >
                       <Truck className="mr-2 h-4 w-4" />
-                      Join Existing Job
+                      Join Existing Job ({activeJobs.length} available)
                     </Button>
                   )}
                 </div>
