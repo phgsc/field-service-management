@@ -294,15 +294,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .send("Cannot start new journey while another visit is active");
       }
 
-      const visit = await storage.createVisit({
+      // Create visit with minimum required data
+      const visitData: InsertVisit = {
         userId: req.user.id,
         jobId: req.body.jobId,
         status: ServiceStatus.ON_ROUTE,
         startTime: new Date(),
         journeyStartTime: new Date(),
-        latitude: req.body.latitude,
-        longitude: req.body.longitude,
-      });
+        // Default coordinates if none provided
+        latitude: req.body.latitude || "0.0",
+        longitude: req.body.longitude || "0.0",
+      };
+      
+      const visit = await storage.createVisit(visitData);
       res.json(visit);
     } catch (err) {
       console.log("!Error : " + err);
