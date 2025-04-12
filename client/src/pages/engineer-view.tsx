@@ -175,6 +175,7 @@ export default function EngineerView() {
   // Resume visit mutation
   const resumeVisitMutation = useMutation({
     mutationFn: async ({ visitId, resumeType }: { visitId: string; resumeType: 'journey' | 'service' }) => {
+      // No need to check for location - we've made it optional
       const res = await apiRequest("POST", `/api/visits/${visitId}/resume`, { resumeType });
       return res.json();
     },

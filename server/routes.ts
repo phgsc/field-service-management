@@ -543,9 +543,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/visits", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     try {
-      const visits = await storage.getVisits(
-        req.user.isAdmin ? undefined : req.user.id,
-      );
+      // If admin, get all visits
+      // If engineer, get their own visits AND all active visits they can join
+      let visits = [];
+      
+      if (req.user.isAdmin) {
+        // Admin gets all visits
+        visits = await storage.getVisits();
+      } else {
+        // Engineer gets their own visits
+        const engineerVisits = await storage.getVisits(req.user.id);
+        
+        // Also get all active visits they might join (for collaboration)
+        const allVisits = await storage.getVisits();
+        const activeOtherVisits = allVisits.filter(v => 
+          v.userId !== req.user.id && 
+          [ServiceStatus.ON_ROUTE, ServiceStatus.IN_SERVICE].includes(v.status as keyof typeof ServiceStatus) &&
+          !(v.collaborators || []).includes(req.user.id)
+        );
+        
+        // Combine both sets of visits
+        visits = [...engineerVisits, ...activeOtherVisits];
+      }
+      
       res.json(visits);
     } catch (err) {
       res.status(500).send((err as Error).message);
