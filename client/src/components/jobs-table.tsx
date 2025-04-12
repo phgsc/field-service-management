@@ -18,9 +18,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { format, subMonths } from "date-fns";
-import { Calendar as CalendarIcon, MapPin, Play, Truck, Ban } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, Play, Truck, Ban, Users } from "lucide-react";
 import { useState } from "react";
 import { Visit, ServiceStatus, User } from "@shared/schema";
 import { Link } from "wouter";
@@ -28,6 +34,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { Badge } from "@/components/ui/badge";
 
 type JobsTableProps = {
   visits: Visit[];
@@ -276,6 +283,9 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
                 Service Time
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Team
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -283,6 +293,11 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredVisits.map((visit) => {
               const engineer = engineers.find((e) => e.id === visit.userId);
+              // Get collaborator engineers
+              const collaborators = visit.collaborators 
+                ? engineers.filter(e => visit.collaborators?.includes(e.id)) 
+                : [];
+              
               return (
                 <tr key={visit.id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -311,6 +326,39 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
                       : "Not started"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {collaborators.length > 0 ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center">
+                              <Users className="h-4 w-4 mr-1 text-blue-600" />
+                              <Badge variant="outline" className="bg-blue-50">
+                                {collaborators.length} helping
+                              </Badge>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="space-y-1 p-1">
+                              <p className="text-xs font-semibold mb-1">Collaborating Engineers:</p>
+                              {collaborators.map(collab => (
+                                <p key={collab.id} className="text-xs">
+                                  {collab.profile?.name || collab.username}
+                                </p>
+                              ))}
+                              {visit.collaborationNotes && (
+                                <div className="mt-2 border-t pt-1">
+                                  <p className="text-xs text-gray-500">{visit.collaborationNotes}</p>
+                                </div>
+                              )}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <span className="text-gray-400">None</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex items-center gap-2">
                       <Link
                         to={`/map/${visit.userId}`}
@@ -336,7 +384,10 @@ export function JobsTable({ visits, engineers }: JobsTableProps) {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => unblockVisitMutation.mutate(visit.id)}
+                          onClick={() => {
+                            setSelectedVisit(visit);
+                            setIsDialogOpen(true);
+                          }}
                           disabled={unblockVisitMutation.isPending}
                         >
                           <Ban className="h-4 w-4 mr-1" />
