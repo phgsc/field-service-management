@@ -368,7 +368,7 @@ export default function EngineerView() {
                           Engineer ID: {engineer}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          Location: {job.latitude}, {job.longitude}
+                          Location: {job.latitude || 'N/A'}, {job.longitude || 'N/A'}
                         </div>
                         <Button 
                           className="w-full mt-2"
@@ -393,12 +393,76 @@ export default function EngineerView() {
       </Dialog>
     );
   };
+  
+  // Resume Visit Dialog
+  const renderResumeDialog = () => {
+    return (
+      <Dialog open={isResumeDialogOpen} onOpenChange={setIsResumeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Resume Visit</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Select an option to resume the visit:
+            </p>
+            <div className="space-y-4">
+              <Card className="p-4">
+                <div className="flex flex-col space-y-2">
+                  <span className="font-medium">Resume Journey</span>
+                  <p className="text-sm text-muted-foreground">
+                    Resume traveling to the service location
+                  </p>
+                  <Button 
+                    className="w-full mt-2"
+                    onClick={() => selectedVisit && resumeVisitMutation.mutate({ visitId: selectedVisit.id, resumeType: 'journey' })}
+                    disabled={resumeVisitMutation.isPending}
+                  >
+                    {resumeVisitMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Truck className="mr-2 h-4 w-4" />
+                    )}
+                    Resume Journey
+                  </Button>
+                </div>
+              </Card>
+              
+              <Card className="p-4">
+                <div className="flex flex-col space-y-2">
+                  <span className="font-medium">Resume Service</span>
+                  <p className="text-sm text-muted-foreground">
+                    Resume the service at the location
+                  </p>
+                  <Button 
+                    className="w-full mt-2"
+                    onClick={() => selectedVisit && resumeVisitMutation.mutate({ visitId: selectedVisit.id, resumeType: 'service' })}
+                    disabled={resumeVisitMutation.isPending}
+                  >
+                    {resumeVisitMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Play className="mr-2 h-4 w-4" />
+                    )}
+                    Resume Service
+                  </Button>
+                </div>
+              </Card>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="space-y-4">
         {/* Join Job Dialog */}
         {renderJoinJobDialog()}
+        
+        {/* Resume Dialog */}
+        {renderResumeDialog()}
         
         {/* Performance Dashboard */}
         {settings?.gamificationEnabled && (
