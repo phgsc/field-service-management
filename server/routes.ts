@@ -487,6 +487,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Handle engineer joining an existing job
+  app.post("/api/visits/:id/join", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    try {
+      const { latitude, longitude } = req.body;
+      
+      // Input validation
+      if (!latitude || !longitude) {
+        return res.status(400).send("Latitude and longitude are required");
+      }
+      
+      // Get original visit
+      const visit = await storage.getVisit(req.params.id);
+      if (!visit) return res.status(404).send("Visit not found");
+      
+      // Only active jobs can be joined
+      if (![ServiceStatus.ON_ROUTE, ServiceStatus.IN_SERVICE].includes(visit.status as keyof typeof ServiceStatus)) {
+        return res.status(400).send("Can only join active visits (on route or in service)");
+      }
+      
+      // Ensure engineer isn't already assigned or collaborating
+      if (visit.userId === req.user.id) {
+        return res.status(400).send("You are already assigned to this job");
+      }
+      
+      const collaborators = visit.collaborators || [];
+      if (collaborators.includes(req.user.id)) {
+        return res.status(400).send("You are already collaborating on this job");
+      }
+      
+      // Add engineer as collaborator
+      const updatedVisit = await storage.updateVisitStatus(req.params.id, {
+        collaborators: [...collaborators, req.user.id],
+        collaborationNotes: visit.collaborationNotes
+          ? `${visit.collaborationNotes}\n${req.user.profile?.name || req.user.username} joined at ${new Date().toLocaleString()}`
+          : `${req.user.profile?.name || req.user.username} joined at ${new Date().toLocaleString()}`
+      });
+      
+      // Record location for the collaborator too
+      await storage.createLocation({
+        userId: req.user.id,
+        latitude,
+        longitude,
+        timestamp: new Date()
+      });
+      
+      res.json(updatedVisit);
+    } catch (err) {
+      res.status(500).send((err as Error).message);
+    }
+  });
+
   app.get("/api/visits", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     try {
